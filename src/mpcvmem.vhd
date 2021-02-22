@@ -25,28 +25,27 @@ entity mpcvmem is
     --
     g_SECOND_PORT         : string := "none"; -- none, normal
     --
-    g_PIPELINE_IN_REGS    : natural := 0;
-    g_PIPELINE_OUT_REGS   : natural := 0;
+    g_OUT_PIPELINE        : natural := 4;
 
-    g_RAM_WIDTH           : integer := 64;
-    g_RAM_DEPTH           : integer := 9600     -- maximum depth of the ram, also the maximum delay
+    g_MEM_WIDTH           : integer := 64;
+    g_MEM_DEPTH           : integer := 9600     -- maximum depth of the ram, also the maximum delay
   );
   port (
     clk                   : in std_logic;
     rst                   : in std_logic;
     ena                   : in std_logic := '1';
     -- Port A
-    i_addr_a              : in  std_logic_vector(g_RAM_DEPTH-1 downto 0):= (others => '0');
-    i_din_a               : in  std_logic_vector(g_RAM_WIDTH - 1 downto 0) := (others => '0');
+    i_addr_a              : in  std_logic_vector(integer(log2(real(g_MEM_DEPTH)))-1 downto 0):= (others => '0');
+    i_din_a               : in  std_logic_vector(g_MEM_WIDTH - 1 downto 0) := (others => '0');
     i_dv_in_a             : in  std_logic := '1';
-    o_dout_a              : out std_logic_vector(g_RAM_WIDTH - 1 downto 0);
+    o_dout_a              : out std_logic_vector(g_MEM_WIDTH - 1 downto 0);
     o_dv_out_a             : out std_logic := '1';
 
     -- Port B
-    i_addr_b              : in  std_logic_vector(g_RAM_DEPTH-1 downto 0):= (others => '0');
-    i_din_b               : in  std_logic_vector(g_RAM_WIDTH - 1 downto 0) := (others => '0');
+    i_addr_b              : in  std_logic_vector(integer(log2(real(g_MEM_DEPTH)))-1 downto 0):= (others => '0');
+    i_din_b               : in  std_logic_vector(g_MEM_WIDTH - 1 downto 0) := (others => '0');
     i_dv_in_b             : in  std_logic := '1';
-    o_dout_b              : out std_logic_vector(g_RAM_WIDTH - 1 downto 0);
+    o_dout_b              : out std_logic_vector(g_MEM_WIDTH - 1 downto 0);
     o_dv_out_b             : out std_logic := '1';
 
     -- Flags
@@ -55,20 +54,22 @@ entity mpcvmem is
     o_full                : out std_logic;
     o_full_next           : out std_logic;
     -- used counter
-    o_used                : out integer range g_RAM_DEPTH - 1 downto 0;
+    o_used                : out integer range integer(log2(real(g_MEM_DEPTH))) - 1 downto 0
     -- The delay can be changed by the offset and resetting the module
-    i_delay               : in integer range g_RAM_DEPTH - 1 downto 0 := g_RAM_DEPTH-1  
+    -- i_delay               : in integer range g_RAM_DEPTH - 1 downto 0 := g_RAM_DEPTH-1  
   );
 end entity mpcvmem;
 
 architecture beh of mpcvmem is
-
+  --------------------------------
+  -- components
+  --------------------------------
   component DualPortMem is
     generic(
       g_MEMORY_TYPE         : string := "auto";
       g_ENABLE_SECOND_PORT  : std_logic := '0';
-      g_RAM_WIDTH           : integer := 16;
-      g_RAM_DEPTH           : integer := 1
+      g_RAM_WIDTH           : integer := 8;
+      g_RAM_DEPTH           : integer := 32
     );
     port (
       clk         : in std_logic;
@@ -76,51 +77,113 @@ architecture beh of mpcvmem is
       -- Port A
       i_addr_a    : in std_logic_vector(g_RAM_DEPTH-1 downto 0);
       i_din_a     : in std_logic_vector(g_RAM_WIDTH-1 downto 0);
+      i_wr_nrd_a  : in  std_logic;
       o_dout_a    : out std_logic_vector(g_RAM_WIDTH-1 downto 0);
       -- Port B
       i_addr_b    : in std_logic_vector(g_RAM_DEPTH-1 downto 0);
       i_din_b     : in std_logic_vector(g_RAM_WIDTH-1 downto 0);
-      o_dout_b    : out std_logic_vector(g_RAM_WIDTH-1 downto 0);
-      -- 
-      i_wen_a     : in std_logic;
-      i_wen_b     : in std_logic
+      i_wr_nrd_b  : in  std_logic;
+      o_dout_b    : out std_logic_vector(g_RAM_WIDTH-1 downto 0)
     );
   end component DualPortMem;
-  
+  --------------------------------
+  -- constants
+  --------------------------------
+  constant MEM_WIDTH : integer := g_MEM_WIDTH + 1;
+  --------------------------------
+  -- signals
+  --------------------------------
+  signal ena_pipes : std_logic_vector(g_OUT_PIPELINE downto 0);
+  type my_pipes is array (g_OUT_PIPELINE-1 downto 0) of std_logic_vector(g_RAM_WIDTH-1 downto 0);
+  signal data_pipes : my_pipes;
+
+  signal ENABLE_SECOND_PORT : integer;
+
+  signal wr_index : integer range 0 to g_RAM_DEPTH -1 := 0;
+  signal rd_index : integer range 0 to g_RAM_DEPTH -1 := 0;
+
+  signal mem_addr_a : std_logic_vector(g_RAM_DEPTH-1 downto 0);
+  signal mem_addr_b : std_logic_vector(g_RAM_DEPTH-1 downto 0);
+  signal mem_in_a : std_logic_vector(g_RAM_WIDTH - 1 downto 0);
+  signal mem_in_b : std_logic_vector(g_RAM_WIDTH - 1 downto 0);
+  signal mem_out_a : std_logic_vector(g_RAM_WIDTH - 1 downto 0);
+  signal mem_out_b : std_logic_vector(g_RAM_WIDTH - 1 downto 0);
+
+  --------------------------------
+  -- functions
+  --------------------------------
+  function get_read_index( 
+    read_index : integer ;
+    write_index : integer := 0;
+    fi_delay : integer := 0
+    ) return integer is
+    variable o_rd_index : integer := 0;
+    begin
+    if g_LOGIC_TYPE = "fifo" then
+      if read_index < g_RAM_DEPTH - 1 then
+        o_rd_index := read_index + 1;
+      else
+        o_rd_index := 0;
+      end if;
+    elsif g_LOGIC_TYPE = "pipeline" then
+      if write_index - fi_delay >= 0 then
+        o_rd_index := write_index - fi_delay;
+      else
+        o_rd_index := (g_RAM_DEPTH - 1) - (fi_delay - 1)  + write_index;
+      end if;
+    else
+      -- ERROR
+    end if;
+    return o_rd_index;
+
+  end function;
+  function get_write_index(write_index : integer) return integer is
+    variable o_wr_index : integer := 0;
+    begin
+    if write_index < g_RAM_DEPTH - 1 then
+      o_wr_index := write_index + 1;
+    else
+      o_wr_index := 0;
+    end if;
+    return o_wr_index;
+  end function;
 begin
+
+  -- SECOND_PORT_GEN : if g_ENABLE_SECOND_PORT = "none" generate
+  --   ENABLE_SECOND_PORT <= '0';
+  -- end generate;
   
   PIPE_GEN : if g_LOGIC_TYPE = "pipeline" generate
 
+    PL_ULTRA: if g_MEMORY_TYPE = "ultra" generate
+
     RAM_MEM : DualPortMem
       generic map(
-        g_MEMORY_TYPE => g_MEMORY_TYPE
-        g_ENABLE_SECOND_PORT => g_ENABLE_SECOND_PORT,
+        g_MEMORY_TYPE => g_MEMORY_TYPE,
+        g_ENABLE_SECOND_PORT => '1',
         g_RAM_WIDTH => g_RAM_WIDTH,
         g_RAM_DEPTH => g_RAM_DEPTH
       )
       port map(
         clk         => clk,
-        ena         => 
+        ena         => ena,
         -- Port A
-        i_addr_a    => 
-        i_din_a     => 
-        o_dout_a    => 
-        -- Port B
-        i_addr_b    => 
-        i_din_b     => 
-        o_dout_b    => 
-        -- 
-        i_wen_a     => 
-        i_wen_b     => 
+        i_addr_a     => mem_addr_a,--std_logic_vector(to_unsigned(mem_addr_a)); 
+        i_din_a      => mem_in_a,
+        i_wr_nrd_a   => '1',
+        o_dout_a     => mem_out_a,
+        -- Port B 
+        i_addr_b     => mem_addr_b,--std_logic_vector(to_unsigned(mem_addr_b));
+        i_din_b      => mem_in_b,
+        i_wr_nrd_b   => '0',
+        o_dout_b     => mem_out_b
+
       );
 
+    end generate PL_ULTRA;
 
 
-
-    case_options <= i_wr & mem_dv(rd_index);
-
-    MEM_PROC: process(clk)
-    begin
+    MEM_CTRL: process(clk) begin
       if rising_edge(clk) then
         if rst = '1' then
           -- mem <= (others => (others => '0'));
@@ -135,15 +198,6 @@ begin
         else
 
 
-          --------------------------------
-          -- PIPELINES CTRL
-          --------------------------------
-          -- if g_PIPELINE_IN_REGS = 0 then
-          -- else
-          -- end if;
-          -- if g_PIPELINE_OUT_REGS = 0 then
-          -- else
-          -- end if;
           --------------------------------
           -- INPUT SIGNALS CTRL
           --------------------------------
@@ -175,56 +229,56 @@ begin
           --------------------------------
           -- INPUT SIGNALS CTRL
           --------------------------------
-          if ena = '1' then
-            mem_dv(wr_index) <= i_wr;
-            mem(wr_index) <= int_wr_data;
-          end if;
 
-          if ena = '1' then
-            if mem_dv(rd_index) = '1' then
-              output_pipeline(g_PIPELINE_OUT_REGS) <= mem(rd_index);
-            else
-              output_pipeline(g_PIPELINE_OUT_REGS) <= (others => '0');
-            end if;
-            output_dv_pipeline(g_PIPELINE_OUT_REGS) <= mem_dv(rd_index);
-          end if;
-          -- case case_options is
-          --   when b"00" => -- idle
-
-          --   when b"10" => -- write
-
-          --     -- mem_dv(wr_index) <= i_wr;
-          --     -- mem(wr_index) <= int_wr_data;
-          --     used_data <= used_data + 1;
-
-          --   when b"01" => -- read
-            
-          --     -- o_rd_data <= mem(rd_index);
-          --     -- o_rd_dv <= mem_dv(rd_index);
-          --     -- mem_dv(rd_index) <= '0';
-          --     used_data <= used_data - 1;
-              
-          --   when b"11" => -- read & write 
-
-          --     -- o_rd_data <= mem(rd_index);
-          --     -- o_rd_dv <= mem_dv(rd_index);
-          --     mem_dv(wr_index) <= '1';
-          --     mem(wr_index) <= int_wr_data;
-
-          --   when others =>
-          --     -- ERROR
-            
-          -- end case;
-          
           --------------------------------
           -- index  CTRL
           --------------------------------
-          wr_index <= get_write_index(wr_index);
-          rd_index <= get_read_index(rd_index,wr_index + 1,i_delay);
+          mem_addr_a <=std_logic_vector(to_unsigned( get_write_index(wr_index) ));
+          mem_addr_b <=std_logic_vector(to_unsigned( get_read_index(rd_index,wr_index + 1,i_delay) ));
 
         end if;
       end if;
-    end process MEM_PROC;
+    end process MEM_CTRL;
+
+    --------------------------------
+    -- PIPELINES CTRL
+    --------------------------------
+
+    NO_OUT_PL_GEN: if g_OUT_PIPELINE = 0 generate
+      o_dout_a <= mem_out_b;
+    end generate NO_OUT_PL;
+
+    OUT_PL_GEN: if g_OUT_PIPELINE > 0 generate
+      -- enable pl
+      ena_0: process(clk) begin
+        if rising_edge(clk) then
+          ena_pipes(0) <= ena;
+          for i in 1 to g_OUT_PIPELINE loop
+            ena_pipes(i) <= ena_pipes(i-1);
+          end loop;
+        end if;
+      end process ena_0;
+      -- data pl
+      proc0: process(clk)
+      begin
+        if rising_edge(clk) then
+          if (ena_pipes(0) = '1') then
+            data_pipes(0) <= ramout;
+            for j in 1 to NPIPES-1 loop
+              if (ena_pipes(j) = '1') then
+                  data_pipes(j) <= data_pipes(j-1);
+              end if;
+            end loop;
+          end if;
+          if (rst = '1') then
+            o_dout_b <= (others => '0');
+          elsif (ena_pipes(NPIPES) = '1') then
+            o_dout_b <= data_pipes(NPIPES-1);
+          end if;
+        end if;
+      end process proc0;
+
+    end generate NO_OUT_PL;
     
   end generate;
   
