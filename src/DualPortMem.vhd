@@ -21,7 +21,7 @@ entity DualPortMem is
     g_MEMORY_TYPE         : string := "auto";
     g_ENABLE_SECOND_PORT  : std_logic := '0';
     g_RAM_WIDTH           : integer := 8;
-    g_ADD_WIDTH           : integer := 32
+    g_ADD_WIDTH           : integer := 8
   );
   port (
     clk : in std_logic;

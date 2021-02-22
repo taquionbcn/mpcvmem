@@ -69,18 +69,18 @@ architecture beh of mpcvmem is
       g_MEMORY_TYPE         : string := "auto";
       g_ENABLE_SECOND_PORT  : std_logic := '0';
       g_RAM_WIDTH           : integer := 8;
-      g_RAM_DEPTH           : integer := 32
+      g_ADD_WIDTH           : integer := 8
     );
     port (
       clk         : in std_logic;
       ena         : in std_logic;
       -- Port A
-      i_addr_a    : in std_logic_vector(g_RAM_DEPTH-1 downto 0);
+      i_addr_a    : in std_logic_vector(g_ADD_WIDTH-1 downto 0);
       i_din_a     : in std_logic_vector(g_RAM_WIDTH-1 downto 0);
       i_wr_nrd_a  : in  std_logic;
       o_dout_a    : out std_logic_vector(g_RAM_WIDTH-1 downto 0);
       -- Port B
-      i_addr_b    : in std_logic_vector(g_RAM_DEPTH-1 downto 0);
+      i_addr_b    : in std_logic_vector(g_ADD_WIDTH-1 downto 0);
       i_din_b     : in std_logic_vector(g_RAM_WIDTH-1 downto 0);
       i_wr_nrd_b  : in  std_logic;
       o_dout_b    : out std_logic_vector(g_RAM_WIDTH-1 downto 0)
@@ -89,25 +89,29 @@ architecture beh of mpcvmem is
   --------------------------------
   -- constants
   --------------------------------
+  constant ADD_WIDTH : integer := integer(log2(real(g_MEM_DEPTH)));
+  constant MEM_DEPTH : integer := 2**ADD_WIDTH;
   constant MEM_WIDTH : integer := g_MEM_WIDTH + 1;
   --------------------------------
   -- signals
   --------------------------------
   signal ena_pipes : std_logic_vector(g_OUT_PIPELINE downto 0);
-  type my_pipes is array (g_OUT_PIPELINE-1 downto 0) of std_logic_vector(g_RAM_WIDTH-1 downto 0);
+  type my_pipes is array (g_OUT_PIPELINE-1 downto 0) of std_logic_vector(MEM_WIDTH-1 downto 0);
   signal data_pipes : my_pipes;
 
   signal ENABLE_SECOND_PORT : integer;
 
-  signal wr_index : integer range 0 to g_RAM_DEPTH -1 := 0;
-  signal rd_index : integer range 0 to g_RAM_DEPTH -1 := 0;
+  signal wr_index : integer range 0 to g_MEM_DEPTH -1 := 0;
+  signal rd_index : integer range 0 to g_MEM_DEPTH -1 := 0;
 
-  signal mem_addr_a : std_logic_vector(g_RAM_DEPTH-1 downto 0);
-  signal mem_addr_b : std_logic_vector(g_RAM_DEPTH-1 downto 0);
-  signal mem_in_a : std_logic_vector(g_RAM_WIDTH - 1 downto 0);
-  signal mem_in_b : std_logic_vector(g_RAM_WIDTH - 1 downto 0);
-  signal mem_out_a : std_logic_vector(g_RAM_WIDTH - 1 downto 0);
-  signal mem_out_b : std_logic_vector(g_RAM_WIDTH - 1 downto 0);
+  signal mem_addr_a : std_logic_vector(ADD_WIDTH-1 downto 0);
+  signal mem_addr_b : std_logic_vector(ADD_WIDTH-1 downto 0);
+  signal mem_in_a : std_logic_vector(MEM_WIDTH - 1 downto 0);
+  signal mem_in_b : std_logic_vector(MEM_WIDTH - 1 downto 0);
+  signal mem_out_a : std_logic_vector(MEM_WIDTH - 1 downto 0);
+  signal mem_out_b : std_logic_vector(MEM_WIDTH - 1 downto 0);
+
+  signal used_data : integer range g_RAM_DEPTH - 1 downto 0 := 0;
 
   --------------------------------
   -- functions
@@ -120,7 +124,7 @@ architecture beh of mpcvmem is
     variable o_rd_index : integer := 0;
     begin
     if g_LOGIC_TYPE = "fifo" then
-      if read_index < g_RAM_DEPTH - 1 then
+      if read_index < MEM_DEPTH - 1 then
         o_rd_index := read_index + 1;
       else
         o_rd_index := 0;
@@ -129,7 +133,7 @@ architecture beh of mpcvmem is
       if write_index - fi_delay >= 0 then
         o_rd_index := write_index - fi_delay;
       else
-        o_rd_index := (g_RAM_DEPTH - 1) - (fi_delay - 1)  + write_index;
+        o_rd_index := (MEM_DEPTH - 1) - (fi_delay - 1)  + write_index;
       end if;
     else
       -- ERROR
@@ -140,7 +144,7 @@ architecture beh of mpcvmem is
   function get_write_index(write_index : integer) return integer is
     variable o_wr_index : integer := 0;
     begin
-    if write_index < g_RAM_DEPTH - 1 then
+    if write_index < MEM_DEPTH - 1 then
       o_wr_index := write_index + 1;
     else
       o_wr_index := 0;
@@ -154,6 +158,8 @@ begin
   -- end generate;
   
   PIPE_GEN : if g_LOGIC_TYPE = "pipeline" generate
+    constant PL_DELAY : integer := g_MEM_DEPTH;
+  begin
 
     PL_ULTRA: if g_MEMORY_TYPE = "ultra" generate
 
@@ -161,8 +167,8 @@ begin
       generic map(
         g_MEMORY_TYPE => g_MEMORY_TYPE,
         g_ENABLE_SECOND_PORT => '1',
-        g_RAM_WIDTH => g_RAM_WIDTH,
-        g_RAM_DEPTH => g_RAM_DEPTH
+        g_RAM_WIDTH => MEM_WIDTH,
+        g_ADD_WIDTH => ADD_WIDTH
       )
       port map(
         clk         => clk,
@@ -187,7 +193,7 @@ begin
       if rising_edge(clk) then
         if rst = '1' then
           -- mem <= (others => (others => '0'));
-          mem_dv <= (others => '0');
+          -- mem_dv <= (others => '0');
           rd_index <= get_read_index(rd_index,wr_index);
           wr_index <= 0;
           o_empty       <= '1';
@@ -212,12 +218,12 @@ begin
             o_empty_next  <= '1';
             o_full        <= '0';
             o_full_next   <= '0';
-          elsif used_data < g_RAM_DEPTH - 2  then
+          elsif used_data < g_MEM_DEPTH - 2  then
             o_empty       <= '0';
             o_empty_next  <= '0';
             o_full        <= '0';
             o_full_next   <= '1';
-          elsif used_data < g_RAM_DEPTH - 1  then
+          elsif used_data < g_MEM_DEPTH - 1  then
             o_empty       <= '0';
             o_empty_next  <= '0';
             o_full        <= '1';
@@ -233,8 +239,8 @@ begin
           --------------------------------
           -- index  CTRL
           --------------------------------
-          mem_addr_a <=std_logic_vector(to_unsigned( get_write_index(wr_index) ));
-          mem_addr_b <=std_logic_vector(to_unsigned( get_read_index(rd_index,wr_index + 1,i_delay) ));
+          mem_addr_a <=std_logic_vector(to_unsigned( get_write_index(wr_index) , ADD_WIDTH ));
+          mem_addr_b <=std_logic_vector(to_unsigned( get_read_index(rd_index,wr_index + 1,PL_DELAY) , ADD_WIDTH ));
 
         end if;
       end if;
