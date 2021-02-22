@@ -3,7 +3,6 @@
 --  Guillermo Loustau de Linares
 --  gloustau@cern.ch
 --
---  Project: ATLAS L0MDT Trigger
 --  Module: Dual Port memory
 --  Description: 
 --
