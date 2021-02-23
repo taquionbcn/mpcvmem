@@ -63,39 +63,39 @@ begin
     if rising_edge(clk) then
       -- if rst = '1' then
       -- else
-        if ena = '1' and i_wen_a = '1' then
+        if ena = '1' and i_wr_nrd_a = '1' then
           mem(to_integer(unsigned(i_addr_a))) <= i_din_a;
         end if;
       -- end if;
     end if;
   end process WR_A;
 
-  -- SECOND_PORT: if g_ENABLE_SECOND_PORT = '1' generate
+  SECOND_PORT: if g_ENABLE_SECOND_PORT = '1' generate
   
-  --   RD_B: process(clk)
-  --   begin
-  --     if rising_edge(clk) then
-  --       if rst = '1'' then
-  --       else
-  --         if ena = '1' then
-  --           o_dout_b <= mem(to_integer(unsigned(i_addr_b)));
-  --         end if;
-  --       end if;
-  --     end if;
-  --   end process RD_B;
+    RD_B: process(clk)
+    begin
+      if rising_edge(clk) then
+        -- if rst = '1' then
+        -- else
+          if ena = '1' then
+            o_dout_b <= mem(to_integer(unsigned(i_addr_b)));
+          end if;
+        -- end if;
+      end if;
+    end process RD_B;
 
-  --   WR_B: process(clk)
-  --   begin
-  --     if rising_edge(clk) then
-  --       if rst = '1' then
-  --       else
-  --         if ena = '1' and i_wen_a = '1' then
-  --           mem(to_integer(unsigned(i_addr_b))) <= i_din_b;
-  --         end if;
-  --       end if;
-  --     end if;
-  --   end process WR_B;
-  -- end generate SECOND_PORT;
+    WR_B: process(clk)
+    begin
+      if rising_edge(clk) then
+        -- if rst = '1' then
+        -- else
+          if ena = '1' and i_wr_nrd_b = '1' then
+            mem(to_integer(unsigned(i_addr_b))) <= i_din_b;
+          end if;
+        -- end if;
+      end if;
+    end process WR_B;
+  end generate SECOND_PORT;
   
   
 end architecture beh;

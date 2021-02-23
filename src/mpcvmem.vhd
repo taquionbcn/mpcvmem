@@ -25,6 +25,7 @@ entity mpcvmem is
     --
     g_SECOND_PORT         : string := "none"; -- none, normal
     --
+    g_IN_PIPELINE        : natural := 0;
     g_OUT_PIPELINE        : natural := 4;
 
     g_MEM_WIDTH           : integer := 64;
@@ -111,7 +112,7 @@ architecture beh of mpcvmem is
   signal mem_out_a : std_logic_vector(MEM_WIDTH - 1 downto 0);
   signal mem_out_b : std_logic_vector(MEM_WIDTH - 1 downto 0);
 
-  signal used_data : integer range g_RAM_DEPTH - 1 downto 0 := 0;
+  signal used_data : integer range g_MEM_DEPTH - 1 downto 0 := 0;
 
   --------------------------------
   -- functions
@@ -153,9 +154,9 @@ architecture beh of mpcvmem is
   end function;
 begin
 
-  -- SECOND_PORT_GEN : if g_ENABLE_SECOND_PORT = "none" generate
-  --   ENABLE_SECOND_PORT <= '0';
-  -- end generate;
+  NO_IN_PL_GEN : if g_IN_PIPELINE = 0 generate
+    mem_in_a <= i_din_a & i_dv_in_a;
+  end generate NO_IN_PL_GEN;
   
   PIPE_GEN : if g_LOGIC_TYPE = "pipeline" generate
     constant PL_DELAY : integer := g_MEM_DEPTH;
@@ -163,28 +164,28 @@ begin
 
     PL_ULTRA: if g_MEMORY_TYPE = "ultra" generate
 
-    RAM_MEM : DualPortMem
-      generic map(
-        g_MEMORY_TYPE => g_MEMORY_TYPE,
-        g_ENABLE_SECOND_PORT => '1',
-        g_RAM_WIDTH => MEM_WIDTH,
-        g_ADD_WIDTH => ADD_WIDTH
-      )
-      port map(
-        clk         => clk,
-        ena         => ena,
-        -- Port A
-        i_addr_a     => mem_addr_a,--std_logic_vector(to_unsigned(mem_addr_a)); 
-        i_din_a      => mem_in_a,
-        i_wr_nrd_a   => '1',
-        o_dout_a     => mem_out_a,
-        -- Port B 
-        i_addr_b     => mem_addr_b,--std_logic_vector(to_unsigned(mem_addr_b));
-        i_din_b      => mem_in_b,
-        i_wr_nrd_b   => '0',
-        o_dout_b     => mem_out_b
-
-      );
+      RAM_MEM : DualPortMem
+        generic map(
+          g_MEMORY_TYPE => g_MEMORY_TYPE,
+          g_ENABLE_SECOND_PORT => '1',
+          g_RAM_WIDTH => MEM_WIDTH,
+          g_ADD_WIDTH => ADD_WIDTH
+        )
+        port map(
+          clk         => clk,
+          ena         => ena,
+          -- Port A
+          i_addr_a     => mem_addr_a,--std_logic_vector(to_unsigned(mem_addr_a)); 
+          i_din_a      => mem_in_a,
+          i_wr_nrd_a   => '1',
+          o_dout_a     => mem_out_a,
+          -- Port B 
+          i_addr_b     => mem_addr_b,--std_logic_vector(to_unsigned(mem_addr_b));
+          i_din_b      => mem_in_b,
+          i_wr_nrd_b   => '0',
+          o_dout_b     => mem_out_b
+        )
+      ;
 
     end generate PL_ULTRA;
 
@@ -252,7 +253,7 @@ begin
 
     NO_OUT_PL_GEN: if g_OUT_PIPELINE = 0 generate
       o_dout_a <= mem_out_b;
-    end generate NO_OUT_PL;
+    end generate NO_OUT_PL_GEN;
 
     OUT_PL_GEN: if g_OUT_PIPELINE > 0 generate
       -- enable pl
@@ -269,22 +270,23 @@ begin
       begin
         if rising_edge(clk) then
           if (ena_pipes(0) = '1') then
-            data_pipes(0) <= ramout;
-            for j in 1 to NPIPES-1 loop
+            data_pipes(0) <= mem_out_b;
+            for j in 1 to g_OUT_PIPELINE-1 loop
               if (ena_pipes(j) = '1') then
                   data_pipes(j) <= data_pipes(j-1);
               end if;
             end loop;
           end if;
           if (rst = '1') then
-            o_dout_b <= (others => '0');
-          elsif (ena_pipes(NPIPES) = '1') then
-            o_dout_b <= data_pipes(NPIPES-1);
+            o_dout_a <= (others => '0');
+          elsif (ena_pipes(g_OUT_PIPELINE) = '1') then
+            o_dout_a <= data_pipes(g_OUT_PIPELINE-1)(MEM_WIDTH -1 downto 1);
+            o_dv_out_a <= data_pipes(g_OUT_PIPELINE-1)(0);
           end if;
         end if;
       end process proc0;
 
-    end generate NO_OUT_PL;
+    end generate OUT_PL_GEN;
     
   end generate;
   
