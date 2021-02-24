@@ -36,14 +36,14 @@ entity mpcvmem is
     rst                   : in std_logic;
     ena                   : in std_logic := '1';
     -- Port A
-    i_addr_a              : in  std_logic_vector(integer(log2(real(g_MEM_DEPTH)))-1 downto 0):= (others => '0');
+    i_addr_a              : in  std_logic_vector(integer(ceil(log2(real(g_MEM_DEPTH))))-1 downto 0):= (others => '0');
     i_din_a               : in  std_logic_vector(g_MEM_WIDTH - 1 downto 0) := (others => '0');
     i_dv_in_a             : in  std_logic := '1';
     o_dout_a              : out std_logic_vector(g_MEM_WIDTH - 1 downto 0);
     o_dv_out_a             : out std_logic := '1';
 
     -- Port B
-    i_addr_b              : in  std_logic_vector(integer(log2(real(g_MEM_DEPTH)))-1 downto 0):= (others => '0');
+    i_addr_b              : in  std_logic_vector(integer(ceil(log2(real(g_MEM_DEPTH))))-1 downto 0):= (others => '0');
     i_din_b               : in  std_logic_vector(g_MEM_WIDTH - 1 downto 0) := (others => '0');
     i_dv_in_b             : in  std_logic := '1';
     o_dout_b              : out std_logic_vector(g_MEM_WIDTH - 1 downto 0);
@@ -90,7 +90,7 @@ architecture beh of mpcvmem is
   --------------------------------
   -- constants
   --------------------------------
-  constant ADD_WIDTH : integer := integer(log2(real(g_MEM_DEPTH)));
+  constant ADD_WIDTH : integer := integer(ceil(log2(real(g_MEM_DEPTH))));
   constant MEM_DEPTH : integer := 2**ADD_WIDTH;
   constant MEM_WIDTH : integer := g_MEM_WIDTH + 1;
   --------------------------------
@@ -100,7 +100,7 @@ architecture beh of mpcvmem is
   type my_pipes is array (g_OUT_PIPELINE-1 downto 0) of std_logic_vector(MEM_WIDTH-1 downto 0);
   signal data_pipes : my_pipes;
 
-  signal ENABLE_SECOND_PORT : integer;
+  -- signal ENABLE_SECOND_PORT : integer;
 
   signal wr_index : integer range 0 to g_MEM_DEPTH -1 := 0;
   signal rd_index : integer range 0 to g_MEM_DEPTH -1 := 0;
@@ -121,7 +121,7 @@ architecture beh of mpcvmem is
     read_index : integer ;
     write_index : integer := 0;
     fi_delay : integer := 0
-    ) return integer is
+  ) return integer is
     variable o_rd_index : integer := 0;
     begin
     if g_LOGIC_TYPE = "fifo" then
@@ -142,6 +142,7 @@ architecture beh of mpcvmem is
     return o_rd_index;
 
   end function;
+
   function get_write_index(write_index : integer) return integer is
     variable o_wr_index : integer := 0;
     begin
@@ -155,11 +156,22 @@ architecture beh of mpcvmem is
 begin
 
   NO_IN_PL_GEN : if g_IN_PIPELINE = 0 generate
-    mem_in_a <= i_din_a & i_dv_in_a;
+    in_ctrl_NO: process(clk)
+    begin
+      if rising_edge(clk) then
+        if i_dv_in_a = '1' then
+          mem_in_a <= i_din_a & i_dv_in_a;
+        else
+          mem_in_a <= (others => '0');
+        end if;
+      end if;
+    end process in_ctrl_NO;
+    
   end generate NO_IN_PL_GEN;
   
   PIPE_GEN : if g_LOGIC_TYPE = "pipeline" generate
     constant PL_DELAY : integer := g_MEM_DEPTH;
+    -- constant MEM_DEPTH : integer := 2**ADD_WIDTH;
   begin
 
     PL_ULTRA: if g_MEMORY_TYPE = "ultra" generate
@@ -189,13 +201,16 @@ begin
 
     end generate PL_ULTRA;
 
+    mem_addr_a <=std_logic_vector(to_unsigned( wr_index , ADD_WIDTH ));
+    mem_addr_b <=std_logic_vector(to_unsigned( rd_index , ADD_WIDTH ));
+
 
     MEM_CTRL: process(clk) begin
       if rising_edge(clk) then
         if rst = '1' then
           -- mem <= (others => (others => '0'));
           -- mem_dv <= (others => '0');
-          rd_index <= get_read_index(rd_index,wr_index);
+          rd_index <= get_read_index(rd_index,wr_index,g_MEM_DEPTH);
           wr_index <= 0;
           o_empty       <= '1';
           o_empty_next  <= '1';
@@ -240,8 +255,9 @@ begin
           --------------------------------
           -- index  CTRL
           --------------------------------
-          mem_addr_a <=std_logic_vector(to_unsigned( get_write_index(wr_index) , ADD_WIDTH ));
-          mem_addr_b <=std_logic_vector(to_unsigned( get_read_index(rd_index,wr_index + 1,PL_DELAY) , ADD_WIDTH ));
+          wr_index <= get_write_index(wr_index);
+          rd_index <= get_read_index(rd_index,wr_index + 1,PL_DELAY);
+
 
         end if;
       end if;
