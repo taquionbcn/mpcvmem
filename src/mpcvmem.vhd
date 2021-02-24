@@ -102,8 +102,8 @@ architecture beh of mpcvmem is
 
   -- signal ENABLE_SECOND_PORT : integer;
 
-  signal wr_index : integer range 0 to g_MEM_DEPTH -1 := 0;
-  signal rd_index : integer range 0 to g_MEM_DEPTH -1 := 0;
+  signal wr_index : integer range 0 to MEM_DEPTH -1 := 0;
+  signal rd_index : integer range 0 to MEM_DEPTH -1 := 0;
 
   signal mem_addr_a : std_logic_vector(ADD_WIDTH-1 downto 0);
   signal mem_addr_b : std_logic_vector(ADD_WIDTH-1 downto 0);
