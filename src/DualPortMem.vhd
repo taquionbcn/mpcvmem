@@ -51,7 +51,7 @@ begin
     if rising_edge(clk) then
       -- if rst_a = '1'' then
       -- else
-        if ena = '1' then
+        if ena = '1' and i_wr_nrd_a = '0' then
           o_dout_a <= mem(to_integer(unsigned(i_addr_a)));
         end if;
       -- end if;
@@ -77,7 +77,7 @@ begin
       if rising_edge(clk) then
         -- if rst = '1' then
         -- else
-          if ena = '1' then
+          if ena = '1' and i_wr_nrd_b = '0' then
             o_dout_b <= mem(to_integer(unsigned(i_addr_b)));
           end if;
         -- end if;

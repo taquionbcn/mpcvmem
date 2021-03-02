@@ -22,10 +22,11 @@ entity mpcvmem is
     g_LOGIC_TYPE          : string := "fifo"; -- fifo, pipeline, ram
     g_FIFO_TYPE           : string := "normal"; -- normal , read_ahead
     g_MEMORY_TYPE         : string := "auto"; -- auto, ultra, block, distributed
+    g_DV_TYPE             : string := "int"; -- int , ext
     --
     g_SECOND_PORT         : string := "none"; -- none, normal
     --
-    g_IN_PIPELINE        : natural := 0;
+    g_IN_PIPELINE         : natural := 0;
     g_OUT_PIPELINE        : natural := 4;
 
     g_MEM_WIDTH           : integer := 64;
@@ -87,12 +88,23 @@ architecture beh of mpcvmem is
       o_dout_b    : out std_logic_vector(g_RAM_WIDTH-1 downto 0)
     );
   end component DualPortMem;
+
+  function init_mem_width(m : integer; x : string) return integer is
+    variable y : integer;
+  begin
+    if x = "int" then
+      y := m + 1;
+    else
+      y := m;
+    end if;
+    return y;
+  end function;
   --------------------------------
   -- constants
   --------------------------------
   constant ADD_WIDTH : integer := integer(log2(real(g_MEM_DEPTH)));
   constant MEM_DEPTH : integer := 2**ADD_WIDTH;
-  constant MEM_WIDTH : integer := g_MEM_WIDTH + 1;
+  constant MEM_WIDTH : integer := init_mem_width(g_MEM_WIDTH,g_DV_TYPE);--g_MEM_WIDTH + 1;
   --------------------------------
   -- signals
   --------------------------------
@@ -102,8 +114,8 @@ architecture beh of mpcvmem is
 
   signal ENABLE_SECOND_PORT : integer;
 
-  signal wr_index : integer range 0 to g_MEM_DEPTH -1 := 0;
-  signal rd_index : integer range 0 to g_MEM_DEPTH -1 := 0;
+  signal wr_index : integer range 0 to MEM_DEPTH -1 := 0;
+  signal rd_index : integer range 0 to MEM_DEPTH -1 := 0;
 
   signal mem_addr_a : std_logic_vector(ADD_WIDTH-1 downto 0);
   signal mem_addr_b : std_logic_vector(ADD_WIDTH-1 downto 0);
@@ -112,7 +124,7 @@ architecture beh of mpcvmem is
   signal mem_out_a : std_logic_vector(MEM_WIDTH - 1 downto 0);
   signal mem_out_b : std_logic_vector(MEM_WIDTH - 1 downto 0);
 
-  signal used_data : integer range g_MEM_DEPTH - 1 downto 0 := 0;
+  signal used_data : integer range MEM_DEPTH - 1 downto 0 := 0;
 
   --------------------------------
   -- functions
@@ -142,6 +154,7 @@ architecture beh of mpcvmem is
     return o_rd_index;
 
   end function;
+
   function get_write_index(write_index : integer) return integer is
     variable o_wr_index : integer := 0;
     begin
@@ -153,6 +166,10 @@ architecture beh of mpcvmem is
     return o_wr_index;
   end function;
 begin
+
+  IF_DV_DATA: if g_DV_TYPE = "int" generate
+    
+  end generate IF_DV_DATA;
 
   NO_IN_PL_GEN : if g_IN_PIPELINE = 0 generate
     mem_in_a <= i_din_a & i_dv_in_a;
@@ -188,6 +205,9 @@ begin
       ;
 
     end generate PL_ULTRA;
+
+    mem_addr_a <=std_logic_vector(to_unsigned( wr_index , ADD_WIDTH ));
+    mem_addr_b <=std_logic_vector(to_unsigned( rd_index , ADD_WIDTH ));
 
 
     MEM_CTRL: process(clk) begin
@@ -240,8 +260,10 @@ begin
           --------------------------------
           -- index  CTRL
           --------------------------------
-          mem_addr_a <=std_logic_vector(to_unsigned( get_write_index(wr_index) , ADD_WIDTH ));
-          mem_addr_b <=std_logic_vector(to_unsigned( get_read_index(rd_index,wr_index + 1,PL_DELAY) , ADD_WIDTH ));
+          rd_index <= get_read_index(rd_index,wr_index + 1,PL_DELAY);
+          wr_index <= get_write_index(wr_index);
+          
+
 
         end if;
       end if;
