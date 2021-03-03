@@ -19,7 +19,7 @@ use ieee.numeric_std.all;
 
 library shared_lib;
 
-entity std_pipeline is
+entity pipeline_top is
   generic(
     g_MEMORY_TYPE       : string := "distributed" ;-- auto, ultra, block, distributed
     g_PIPELINE_TYPE     : string := "shift_reg";-- shift_reg , ring_buffer , mpcvmem 
@@ -36,9 +36,9 @@ entity std_pipeline is
     o_data              : out std_logic_vector(g_PIPELINE_WIDTH -1 downto 0);
     o_dv                : out std_logic
   );
-end entity std_pipeline;
+end entity pipeline_top;
 
-architecture beh of std_pipeline is
+architecture beh of pipeline_top is
 
   -- type data_pl_at is array (g_DELAY_CYCLES -1 downto 0) of std_logic_vector(g_PIPELINE_WIDTH -1 downto 0);
   -- signal data_pl : data_pl_at;
