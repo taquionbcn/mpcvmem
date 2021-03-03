@@ -27,7 +27,7 @@ entity mpcvmem is
     g_SECOND_PORT         : string := "none"; -- none, normal
     --
     g_IN_PIPELINE         : natural := 0;
-    g_OUT_PIPELINE        : natural := 4;
+    g_OUT_PIPELINE        : natural := 2;
 
     g_MEM_WIDTH           : integer := 64;
     g_MEM_DEPTH           : integer := 9600     -- maximum depth of the ram, also the maximum delay
@@ -313,6 +313,7 @@ begin
           end if;
           if (rst = '1') then
             o_dout_a <= (others => '0');
+            o_dv_out_a <= '0';
           elsif (ena_pipes(g_OUT_PIPELINE) = '1') then
             o_dout_a <= data_pipes(g_OUT_PIPELINE-1)(MEM_WIDTH -1 downto 1);
             o_dv_out_a <= data_pipes(g_OUT_PIPELINE-1)(0);
