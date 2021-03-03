@@ -75,6 +75,7 @@ architecture beh of mpcvmem is
     );
     port (
       clk         : in std_logic;
+      rst         : in std_logic;
       ena         : in std_logic;
       -- Port A
       i_addr_a    : in std_logic_vector(g_ADD_WIDTH-1 downto 0);
@@ -201,6 +202,7 @@ begin
         )
         port map(
           clk         => clk,
+          rst         => rst,
           ena         => ena,
           -- Port A
           i_addr_a     => mem_addr_a,--std_logic_vector(to_unsigned(mem_addr_a)); 
