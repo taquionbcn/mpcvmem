@@ -21,17 +21,21 @@ entity mpcvmem is
     g_SIMULATION          : std_logic := '0';
     --
     g_LOGIC_TYPE          : string := "fifo"; -- fifo, pipeline, ram
-    g_FIFO_TYPE           : string := "normal"; -- normal , read_ahead
+    g_READ_MODE           : string := "normal"; -- normal , read_ahead
     g_MEMORY_TYPE         : string := "auto"; -- auto, ultra, block, distributed
     g_DV_TYPE             : string := "int"; -- int , ext
-    --
+    -- MEMORY PARAMETERS
     g_SECOND_PORT         : string := "none"; -- none, normal
-    --
+    -- FIFO 
+    -- PIPELINE
+    g_PL_DELAY_CYCLES     : integer := 0;
+    -- RAM
+    -- IN/OUT PARAMETERS
     g_IN_PIPELINE         : natural := 0;
     g_OUT_PIPELINE        : natural := 2;
-
-    g_MEM_WIDTH           : integer := 64;
-    g_MEM_DEPTH           : integer := 9600     -- maximum depth of the ram, also the maximum delay
+    -- MEMORY PARAMETERS
+    g_MEM_WIDTH           : integer := 8;
+    g_MEM_DEPTH           : integer := 8     -- maximum depth of the ram, also the maximum delay
   );
   port (
     clk                   : in std_logic;
