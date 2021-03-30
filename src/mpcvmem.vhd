@@ -41,6 +41,8 @@ entity mpcvmem is
     clk                   : in std_logic;
     rst                   : in std_logic;
     ena                   : in std_logic := '1';
+    --
+    i_freeze              : in std_logic := '0';
     -- Port A
     i_addr_a              : in  std_logic_vector(integer(ceil(log2(real(g_MEM_DEPTH))))-1 downto 0):= (others => '0');
     i_din_a               : in  std_logic_vector(g_MEM_WIDTH - 1 downto 0) := (others => '0');
