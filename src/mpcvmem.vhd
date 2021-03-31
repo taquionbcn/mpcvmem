@@ -141,7 +141,7 @@ architecture beh of mpcvmem is
     read_index : integer ;
     write_index : integer := 0;
     fi_delay : integer := 0
-  ) return integer is
+    ) return integer is
     variable o_rd_index : integer := 0;
     begin
     if g_LOGIC_TYPE = "fifo" then
