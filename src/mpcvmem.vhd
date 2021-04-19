@@ -25,7 +25,7 @@ entity mpcvmem is
     g_MEMORY_TYPE         : string := "auto"; -- auto, ultra, block, distributed
     g_DV_TYPE             : string := "int"; -- int , ext
     -- MEMORY PARAMETERS
-    g_SECOND_PORT         : string := "none"; -- none, normal
+    g_SECOND_PORT         : string := "none"; -- none, normal, monitor
     -- FIFO 
     -- PIPELINE
     g_PL_DELAY_CYCLES     : integer := 0;
@@ -75,7 +75,7 @@ architecture beh of mpcvmem is
   --------------------------------
   component DualPortMem is
     generic(
-      g_MEMORY_TYPE         : string := "auto";
+      g_MEMORY_TYPE         : string := "distributed";
       g_ENABLE_SECOND_PORT  : std_logic := '0';
       g_RAM_WIDTH           : integer := 8;
       g_ADD_WIDTH           : integer := 8
@@ -173,6 +173,9 @@ architecture beh of mpcvmem is
     end if;
     return o_wr_index;
   end function;
+  --------------------------------
+  -- end functions
+  --------------------------------
 begin
 
   IF_DV_DATA: if g_DV_TYPE = "int" generate
@@ -192,6 +195,10 @@ begin
     end process in_ctrl_NO;
     
   end generate NO_IN_PL_GEN;
+
+  MON_GEN: if g_SECOND_PORT = "monitor" generate
+    
+  end generate MON_GEN;
   
   PIPE_GEN : if g_LOGIC_TYPE = "pipeline" generate
     constant PL_DELAY : integer := g_MEM_DEPTH;

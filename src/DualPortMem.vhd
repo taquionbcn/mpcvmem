@@ -18,7 +18,7 @@ use ieee.math_real.all;
 
 entity DualPortMem is
   generic(
-    g_MEMORY_TYPE         : string := "auto";
+    g_MEMORY_TYPE         : string := "distributed";
     g_ENABLE_SECOND_PORT  : std_logic := '0';
     g_RAM_WIDTH           : integer := 8;
     g_ADD_WIDTH           : integer := 8
