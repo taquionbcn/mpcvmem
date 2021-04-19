@@ -20,6 +20,8 @@ entity DualPortMem is
   generic(
     g_MEMORY_TYPE         : string := "distributed";
     g_ENABLE_SECOND_PORT  : std_logic := '0';
+
+    -- g_OUT_PIPELINE        : integer := 0;
     g_RAM_WIDTH           : integer := 8;
     g_ADD_WIDTH           : integer := 8
   );
@@ -55,18 +57,18 @@ begin
   addr_a <= to_integer(unsigned(i_addr_a));
   addr_b <= to_integer(unsigned(i_addr_b));
 
-  -- RD_A: process(clk)
-  -- begin
-  --   if rising_edge(clk) then
-  --     if rst = '1' then
-  --       o_dout_a <= (others => '0');
-  --     else
-  --       if ena = '1' and i_wr_nrd_a = '0' then
-  --         o_dout_a <= mem(addr_a);
-  --       end if;
-  --     end if;
-  --   end if;
-  -- end process RD_A;
+  RD_A: process(clk)
+  begin
+    if rising_edge(clk) then
+      if rst = '1' then
+        o_dout_a <= (others => '0');
+      else
+        if ena = '1' and i_wr_nrd_a = '0' then
+          o_dout_a <= mem(addr_a);
+        end if;
+      end if;
+    end if;
+  end process RD_A;
 
   WR_A: process(clk)
   begin
@@ -95,18 +97,64 @@ begin
       end if;
     end process RD_B;
 
-  --   WR_B: process(clk)
-  --   begin
-  --     if rising_edge(clk) then
-  --       -- if rst = '1' then
-  --       -- else
-  --         if ena = '1' and i_wr_nrd_b = '1' then
-  --           mem(addr_b) <= i_din_b;
-  --         end if;
-  --       -- end if;
-  --     end if;
-  --   end process WR_B;
+    WR_B: process(clk)
+    begin
+      if rising_edge(clk) then
+        -- if rst = '1' then
+        -- else
+          if ena = '1' and i_wr_nrd_b = '1' then
+            mem(addr_b) <= i_din_b;
+          end if;
+        -- end if;
+      end if;
+    end process WR_B;
   -- end generate SECOND_PORT;
+
+  --------------------------------
+    -- PIPELINES CTRL
+    --------------------------------
+
+    -- NO_OUT_PL_GEN: if g_OUT_PIPELINE = 0 generate
+    --   o_dout_a <= mem_out_b;
+    -- end generate NO_OUT_PL_GEN;
+
+    -- OUT_PL_GEN: if g_OUT_PIPELINE > 0 generate
+    --   signal ena_pipes : std_logic_vector(g_OUT_PIPELINE downto 0);
+    --   type my_pipes is array (g_OUT_PIPELINE-1 downto 0) of std_logic_vector(MEM_WIDTH-1 downto 0);
+    --   signal data_pipes : my_pipes;
+    -- begin
+    --   -- enable pl
+    --   ena_0: process(clk) begin
+    --     if rising_edge(clk) then
+    --       ena_pipes(0) <= ena;
+    --       for i in 1 to g_OUT_PIPELINE loop
+    --         ena_pipes(i) <= ena_pipes(i-1);
+    --       end loop;
+    --     end if;
+    --   end process ena_0;
+    --   -- data pl
+    --   proc0: process(clk)
+    --   begin
+    --     if rising_edge(clk) then
+    --       if (ena_pipes(0) = '1') then
+    --         data_pipes(0) <= mem_out_b;
+    --         for j in 1 to g_OUT_PIPELINE-1 loop
+    --           if (ena_pipes(j) = '1') then
+    --               data_pipes(j) <= data_pipes(j-1);
+    --           end if;
+    --         end loop;
+    --       end if;
+    --       if (rst = '1') then
+    --         o_dout_a <= (others => '0');
+    --         o_dv_out_a <= '0';
+    --       elsif (ena_pipes(g_OUT_PIPELINE) = '1') then
+    --         o_dout_a <= data_pipes(g_OUT_PIPELINE-1)(MEM_WIDTH -1 downto 1);
+    --         o_dv_out_a <= data_pipes(g_OUT_PIPELINE-1)(0);
+    --       end if;
+    --     end if;
+    --   end process proc0;
+
+    -- end generate OUT_PL_GEN;
   
   
 end architecture beh;

@@ -77,6 +77,7 @@ architecture beh of mpcvmem is
     generic(
       g_MEMORY_TYPE         : string := "distributed";
       g_ENABLE_SECOND_PORT  : std_logic := '0';
+      -- g_OUT_PIPELINE        : integer := 0;
       g_RAM_WIDTH           : integer := 8;
       g_ADD_WIDTH           : integer := 8
     );
@@ -118,10 +119,13 @@ architecture beh of mpcvmem is
   --------------------------------
   signal ena_pipes : std_logic_vector(g_OUT_PIPELINE downto 0);
   type my_pipes is array (g_OUT_PIPELINE-1 downto 0) of std_logic_vector(MEM_WIDTH-1 downto 0);
-  signal data_pipes : my_pipes;
+  signal data_pipes_A : my_pipes;
+  signal data_pipes_B : my_pipes;
 
   -- signal ENABLE_SECOND_PORT : integer;
 
+  signal wr_index_aux : integer range 0 to MEM_DEPTH -1 := 0;
+  signal rd_index_aux : integer range 0 to MEM_DEPTH -1 := 0;
   signal wr_index : integer range 0 to MEM_DEPTH -1 := 0;
   signal rd_index : integer range 0 to MEM_DEPTH -1 := 0;
 
@@ -163,15 +167,15 @@ architecture beh of mpcvmem is
 
   end function;
 
-  function get_write_index(write_index : integer) return integer is
-    variable o_wr_index : integer := 0;
+  function get_write_index(write_index : integer; index_inc : integer := 1) return integer is
+    variable o_wr_index_aux : integer := 0;
     begin
     if write_index < MEM_DEPTH - 1 then
-      o_wr_index := write_index + 1;
+      o_wr_index_aux := write_index + index_inc;
     else
-      o_wr_index := 0;
+      o_wr_index_aux := 0;
     end if;
-    return o_wr_index;
+    return o_wr_index_aux;
   end function;
   --------------------------------
   -- end functions
@@ -183,21 +187,23 @@ begin
   end generate IF_DV_DATA;
 
   NO_IN_PL_GEN : if g_IN_PIPELINE = 0 generate
-    in_ctrl_NO: process(clk)
-    begin
-      if rising_edge(clk) then
-        if i_dv_in_a = '1' then
+    -- in_ctrl_NO: process(clk)
+    -- begin
+    --   if rising_edge(clk) then
+    --     if i_dv_in_a = '1' then
           mem_in_a <= i_din_a & i_dv_in_a;
-        else
-          mem_in_a <= (others => '0');
-        end if;
-      end if;
-    end process in_ctrl_NO;
+          mem_in_b <= i_din_b & i_dv_in_b;
+    --     else
+    --       mem_in_a <= (others => '0');
+    --     end if;
+    --   end if;
+    -- end process in_ctrl_NO;
     
   end generate NO_IN_PL_GEN;
 
   MON_GEN: if g_SECOND_PORT = "monitor" generate
-    
+    -- mem_addr_b <= i_addr_b;
+    -- mem_in_b <= i_din_b;
   end generate MON_GEN;
   
   PIPE_GEN : if g_LOGIC_TYPE = "pipeline" generate
@@ -211,6 +217,7 @@ begin
         generic map(
           g_MEMORY_TYPE => g_MEMORY_TYPE,
           g_ENABLE_SECOND_PORT => '1',
+          -- g_OUT_PIPELINE => 2,
           g_RAM_WIDTH => MEM_WIDTH,
           g_ADD_WIDTH => ADD_WIDTH
         )
@@ -233,7 +240,8 @@ begin
 
     end generate PL_ULTRA;
 
-    mem_addr_a <=std_logic_vector(to_unsigned( wr_index , ADD_WIDTH ));
+
+    mem_addr_a <= std_logic_vector(to_unsigned( wr_index , ADD_WIDTH ));
     mem_addr_b <=std_logic_vector(to_unsigned( rd_index , ADD_WIDTH ));
 
 
@@ -242,8 +250,8 @@ begin
         if rst = '1' then
           -- mem <= (others => (others => '0'));
           -- mem_dv <= (others => '0');
-          rd_index <= get_read_index(rd_index,wr_index,g_MEM_DEPTH);
-          wr_index <= 0;
+          rd_index_aux <= get_read_index(rd_index_aux,wr_index_aux,g_MEM_DEPTH);
+          wr_index_aux <= 0;
           o_empty       <= '1';
           o_empty_next  <= '1';
           o_full        <= '0';
@@ -287,8 +295,16 @@ begin
           --------------------------------
           -- index  CTRL
           --------------------------------
-          wr_index <= get_write_index(wr_index);
-          rd_index <= get_read_index(rd_index,wr_index + 1,PL_DELAY);
+          wr_index_aux <= get_write_index(wr_index_aux,1);
+          rd_index_aux <= get_read_index(rd_index_aux,wr_index_aux + 1,PL_DELAY);
+          
+          if i_dv_in_b = '0' then -- normal
+            wr_index <= get_write_index(wr_index_aux,0);
+            rd_index <= get_read_index(rd_index_aux,wr_index_aux + 1,PL_DELAY);
+          else -- external
+            wr_index <= to_integer(unsigned(i_addr_b));
+            rd_index <= to_integer(unsigned(i_addr_b));
+          end if;
 
 
         end if;
@@ -300,7 +316,26 @@ begin
     --------------------------------
 
     NO_OUT_PL_GEN: if g_OUT_PIPELINE = 0 generate
-      o_dout_a <= mem_out_b;
+      -- 1 clk latency
+      data_no_pl: process(clk)
+      begin
+        if rising_edge(clk) then
+          if rst = '1' then
+            o_dout_a <= (others => '0');        
+            o_dout_b <= (others => '0');  
+            o_dv_out_a <= '0';
+            o_dv_out_b <= '0';      
+          else
+            o_dout_a <= mem_out_a;        
+            o_dout_b <= mem_out_b;  
+            o_dv_out_a <= mem_out_a(0);
+            o_dv_out_b <= mem_out_b(0); 
+          end if;
+        end if;
+      end process data_no_pl;
+
+      -- 0 clk latency
+      -- o_dout_a <= mem_out_b;
     end generate NO_OUT_PL_GEN;
 
     OUT_PL_GEN: if g_OUT_PIPELINE > 0 generate
@@ -308,20 +343,31 @@ begin
       ena_0: process(clk) begin
         if rising_edge(clk) then
           ena_pipes(0) <= ena;
-          for i in 1 to g_OUT_PIPELINE loop
-            ena_pipes(i) <= ena_pipes(i-1);
-          end loop;
+          -- for i in 1 to g_OUT_PIPELINE loop
+          --   ena_pipes(i) <= ena_pipes(i-1);
+          -- end loop;
         end if;
       end process ena_0;
+
+      ena_pl: if g_OUT_PIPELINE > 1 generate
+        process(clk) begin
+          if rising_edge(clk) then
+            for i in 1 to g_OUT_PIPELINE loop
+              ena_pipes(i) <= ena_pipes(i-1);
+            end loop;
+          end if;
+        end process;
+      end generate ena_pl;
+
       -- data pl
-      proc0: process(clk)
+      proc0_A: process(clk)
       begin
         if rising_edge(clk) then
           if (ena_pipes(0) = '1') then
-            data_pipes(0) <= mem_out_b;
+            data_pipes_A(0) <= mem_out_b;
             for j in 1 to g_OUT_PIPELINE-1 loop
               if (ena_pipes(j) = '1') then
-                  data_pipes(j) <= data_pipes(j-1);
+                  data_pipes_A(j) <= data_pipes_A(j-1);
               end if;
             end loop;
           end if;
@@ -329,11 +375,33 @@ begin
             o_dout_a <= (others => '0');
             o_dv_out_a <= '0';
           elsif (ena_pipes(g_OUT_PIPELINE) = '1') then
-            o_dout_a <= data_pipes(g_OUT_PIPELINE-1)(MEM_WIDTH -1 downto 1);
-            o_dv_out_a <= data_pipes(g_OUT_PIPELINE-1)(0);
+            o_dout_a <= data_pipes_A(g_OUT_PIPELINE-1)(MEM_WIDTH -1 downto 1);
+            o_dv_out_a <= data_pipes_A(g_OUT_PIPELINE-1)(0);
           end if;
         end if;
-      end process proc0;
+      end process proc0_A;
+
+      proc0_B: process(clk)
+      begin
+        if rising_edge(clk) then
+          if (ena_pipes(0) = '1') then
+            data_pipes_B(0) <= mem_out_a;
+            for j in 1 to g_OUT_PIPELINE-1 loop
+              if (ena_pipes(j) = '1') then
+                data_pipes_B(j) <= data_pipes_B(j-1);
+              end if;
+            end loop;
+          end if;
+          if (rst = '1') then
+            o_dout_b <= (others => '0');
+            o_dv_out_b <= '0';
+          elsif (ena_pipes(g_OUT_PIPELINE) = '1') then
+            o_dout_b <= data_pipes_B(g_OUT_PIPELINE-1)(MEM_WIDTH -1 downto 1);
+            o_dv_out_b <= data_pipes_B(g_OUT_PIPELINE-1)(0);
+          end if;
+        end if;
+      end process proc0_B;
+      
 
     end generate OUT_PL_GEN;
     
