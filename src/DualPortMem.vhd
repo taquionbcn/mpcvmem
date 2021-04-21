@@ -60,13 +60,13 @@ begin
   RD_A: process(clk)
   begin
     if rising_edge(clk) then
-      if rst = '1' then
-        o_dout_a <= (others => '0');
-      else
-        if ena = '1' and i_wr_nrd_a = '0' then
+      -- if rst = '1' then
+      --   o_dout_a <= (others => '0');
+      -- else
+        if ena = '1' then --and i_wr_nrd_a = '0' then
           o_dout_a <= mem(addr_a);
         end if;
-      end if;
+      -- end if;
     end if;
   end process RD_A;
 
@@ -87,13 +87,13 @@ begin
     RD_B: process(clk)
     begin
       if rising_edge(clk) then
-        if rst = '1' then
-          o_dout_b <= (others => '0');
-        else
-          if ena = '1' and i_wr_nrd_b = '0' then
+        -- if rst = '1' then
+        --   o_dout_b <= (others => '0');
+        -- else
+          if ena = '1' then -- and i_wr_nrd_b = '0' then
             o_dout_b <= mem(addr_b);
           end if;
-        end if;
+        -- end if;
       end if;
     end process RD_B;
 
