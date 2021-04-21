@@ -28,13 +28,14 @@ entity DualPortMem is
   port (
     clk : in std_logic;
     rst : in std_logic;
-    ena : in std_logic;
     -- Port A
+    ena_a : in std_logic;
     i_addr_a    : in std_logic_vector(g_ADD_WIDTH-1 downto 0);
     i_din_a     : in std_logic_vector(g_RAM_WIDTH-1 downto 0);
     i_wr_nrd_a  : in  std_logic;
     o_dout_a    : out std_logic_vector(g_RAM_WIDTH-1 downto 0);
     -- Port B
+    ena_b : in std_logic;
     i_addr_b    : in std_logic_vector(g_ADD_WIDTH-1 downto 0);
     i_din_b     : in std_logic_vector(g_RAM_WIDTH-1 downto 0);
     i_wr_nrd_b  : in  std_logic;
@@ -63,7 +64,7 @@ begin
       -- if rst = '1' then
       --   o_dout_a <= (others => '0');
       -- else
-        if ena = '1' then --and i_wr_nrd_a = '0' then
+        if ena_a = '1' then --and i_wr_nrd_a = '0' then
           o_dout_a <= mem(addr_a);
         end if;
       -- end if;
@@ -75,7 +76,7 @@ begin
     if rising_edge(clk) then
       -- if rst = '1' then
       -- else
-        if ena = '1' and i_wr_nrd_a = '1' then
+        if ena_a = '1' and i_wr_nrd_a = '1' then
           mem(addr_a) <= i_din_a;
         end if;
       -- end if;
@@ -90,7 +91,7 @@ begin
         -- if rst = '1' then
         --   o_dout_b <= (others => '0');
         -- else
-          if ena = '1' then -- and i_wr_nrd_b = '0' then
+          if ena_b = '1' then -- and i_wr_nrd_b = '0' then
             o_dout_b <= mem(addr_b);
           end if;
         -- end if;
@@ -102,7 +103,7 @@ begin
       if rising_edge(clk) then
         -- if rst = '1' then
         -- else
-          if ena = '1' and i_wr_nrd_b = '1' then
+          if ena_b = '1' and i_wr_nrd_b = '1' then
             mem(addr_b) <= i_din_b;
           end if;
         -- end if;
@@ -126,7 +127,7 @@ begin
     --   -- enable pl
     --   ena_0: process(clk) begin
     --     if rising_edge(clk) then
-    --       ena_pipes(0) <= ena;
+    --       ena_pipes(0) <= ena_a;
     --       for i in 1 to g_OUT_PIPELINE loop
     --         ena_pipes(i) <= ena_pipes(i-1);
     --       end loop;

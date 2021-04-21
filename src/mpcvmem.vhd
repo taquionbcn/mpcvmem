@@ -82,15 +82,16 @@ architecture beh of mpcvmem is
       g_ADD_WIDTH           : integer := 8
     );
     port (
-      clk         : in std_logic;
-      rst         : in std_logic;
-      ena         : in std_logic;
+      clk : in std_logic;
+      rst : in std_logic;
       -- Port A
+      ena_a : in std_logic;
       i_addr_a    : in std_logic_vector(g_ADD_WIDTH-1 downto 0);
       i_din_a     : in std_logic_vector(g_RAM_WIDTH-1 downto 0);
       i_wr_nrd_a  : in  std_logic;
       o_dout_a    : out std_logic_vector(g_RAM_WIDTH-1 downto 0);
       -- Port B
+      ena_b : in std_logic;
       i_addr_b    : in std_logic_vector(g_ADD_WIDTH-1 downto 0);
       i_din_b     : in std_logic_vector(g_RAM_WIDTH-1 downto 0);
       i_wr_nrd_b  : in  std_logic;
@@ -117,7 +118,9 @@ architecture beh of mpcvmem is
   --------------------------------
   -- signals
   --------------------------------
-  signal ena_pipes : std_logic_vector(g_OUT_PIPELINE downto 0);
+  signal ena_a, ena_b : std_logic;
+  signal ena_pipes_a : std_logic_vector(g_OUT_PIPELINE downto 0);
+  signal ena_pipes_b : std_logic_vector(g_OUT_PIPELINE downto 0);
   type my_pipes is array (g_OUT_PIPELINE-1 downto 0) of std_logic_vector(MEM_WIDTH-1 downto 0);
   signal data_pipes_A : my_pipes;
   signal data_pipes_B : my_pipes;
@@ -201,9 +204,9 @@ begin
     
   end generate NO_IN_PL_GEN;
 
-  MON_GEN: if g_SECOND_PORT = "monitor" generate
-    -- mem_addr_b <= i_addr_b;
-    -- mem_in_b <= i_din_b;
+  ena_a <= ena;
+  MON_GEN: if g_SECOND_PORT /= "none" generate
+    ena_b <= ena;
   end generate MON_GEN;
   
   PIPE_GEN : if g_LOGIC_TYPE = "pipeline" generate
@@ -224,13 +227,15 @@ begin
         port map(
           clk         => clk,
           rst         => rst,
-          ena         => ena,
+          
           -- Port A
+          ena_a         => ena_a,
           i_addr_a     => mem_addr_a,--std_logic_vector(to_unsigned(mem_addr_a)); 
           i_din_a      => mem_in_a,
           i_wr_nrd_a   => '1',
           o_dout_a     => mem_out_a,
           -- Port B 
+          ena_b         => ena_b,
           i_addr_b     => mem_addr_b,--std_logic_vector(to_unsigned(mem_addr_b));
           i_din_b      => mem_in_b,
           i_wr_nrd_b   => '0',
@@ -340,33 +345,46 @@ begin
 
     OUT_PL_GEN: if g_OUT_PIPELINE > 0 generate
       -- enable pl
-      ena_0: process(clk) begin
+      ena_a0: process(clk) begin
         if rising_edge(clk) then
-          ena_pipes(0) <= ena;
-          -- for i in 1 to g_OUT_PIPELINE loop
-          --   ena_pipes(i) <= ena_pipes(i-1);
-          -- end loop;
+          ena_pipes_a(0) <= ena_a;
         end if;
-      end process ena_0;
+      end process ena_a0;      
+      
+      ena_b0: process(clk) begin
+        if rising_edge(clk) then
+          ena_pipes_b(0) <= ena_b;
+        end if;
+      end process ena_b0;
 
-      ena_pl: if g_OUT_PIPELINE > 1 generate
+      ena_a_pl: if g_OUT_PIPELINE > 1 generate
         process(clk) begin
           if rising_edge(clk) then
             for i in 1 to g_OUT_PIPELINE loop
-              ena_pipes(i) <= ena_pipes(i-1);
+              ena_pipes_a(i) <= ena_pipes_a(i-1);
             end loop;
           end if;
         end process;
-      end generate ena_pl;
+      end generate ena_a_pl;
+
+      ena_b_pl: if g_OUT_PIPELINE > 1 generate
+        process(clk) begin
+          if rising_edge(clk) then
+            for i in 1 to g_OUT_PIPELINE loop
+              ena_pipes_b(i) <= ena_pipes_b(i-1);
+            end loop;
+          end if;
+        end process;
+      end generate ena_b_pl;
 
       -- data pl
       proc0_A: process(clk)
       begin
         if rising_edge(clk) then
-          if (ena_pipes(0) = '1') then
+          if (ena_pipes_a(0) = '1') then
             data_pipes_A(0) <= mem_out_b;
             for j in 1 to g_OUT_PIPELINE-1 loop
-              if (ena_pipes(j) = '1') then
+              if (ena_pipes_a(j) = '1') then
                   data_pipes_A(j) <= data_pipes_A(j-1);
               end if;
             end loop;
@@ -374,7 +392,7 @@ begin
           if (rst = '1') then
             o_dout_a <= (others => '0');
             o_dv_out_a <= '0';
-          elsif (ena_pipes(g_OUT_PIPELINE) = '1') then
+          elsif (ena_pipes_a(g_OUT_PIPELINE) = '1') then
             o_dout_a <= data_pipes_A(g_OUT_PIPELINE-1)(MEM_WIDTH -1 downto 1);
             o_dv_out_a <= data_pipes_A(g_OUT_PIPELINE-1)(0);
           end if;
@@ -384,10 +402,10 @@ begin
       proc0_B: process(clk)
       begin
         if rising_edge(clk) then
-          if (ena_pipes(0) = '1') then
+          if (ena_pipes_b(0) = '1') then
             data_pipes_B(0) <= mem_out_a;
             for j in 1 to g_OUT_PIPELINE-1 loop
-              if (ena_pipes(j) = '1') then
+              if (ena_pipes_b(j) = '1') then
                 data_pipes_B(j) <= data_pipes_B(j-1);
               end if;
             end loop;
@@ -395,7 +413,7 @@ begin
           if (rst = '1') then
             o_dout_b <= (others => '0');
             o_dv_out_b <= '0';
-          elsif (ena_pipes(g_OUT_PIPELINE) = '1') then
+          elsif (ena_pipes_b(g_OUT_PIPELINE) = '1') then
             o_dout_b <= data_pipes_B(g_OUT_PIPELINE-1)(MEM_WIDTH -1 downto 1);
             o_dv_out_b <= data_pipes_B(g_OUT_PIPELINE-1)(0);
           end if;
