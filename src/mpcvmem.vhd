@@ -132,7 +132,7 @@ architecture beh of mpcvmem is
   signal wr_index : integer range 0 to MEM_DEPTH -1 := 0;
   signal rd_index : integer range 0 to MEM_DEPTH -1 := 0;
 
-  signal mem_addr_a : std_logic_vector(ADD_WIDTH-1 downto 0);
+  signal mem_addr_a : std_logic_vector(ADD_WIDTH-1 downto 0) := (others => '0');
   signal mem_addr_b : std_logic_vector(ADD_WIDTH-1 downto 0);
   signal mem_in_a : std_logic_vector(MEM_WIDTH - 1 downto 0);
   signal mem_in_b : std_logic_vector(MEM_WIDTH - 1 downto 0);
@@ -227,7 +227,6 @@ begin
         port map(
           clk         => clk,
           rst         => rst,
-          
           -- Port A
           ena_a         => ena_a,
           i_addr_a     => mem_addr_a,--std_logic_vector(to_unsigned(mem_addr_a)); 
@@ -348,34 +347,40 @@ begin
       ena_a0: process(clk) begin
         if rising_edge(clk) then
           ena_pipes_a(0) <= ena_a;
+          for i in 1 to g_OUT_PIPELINE loop
+            ena_pipes_a(i) <= ena_pipes_a(i-1);
+          end loop;
         end if;
       end process ena_a0;      
       
       ena_b0: process(clk) begin
         if rising_edge(clk) then
           ena_pipes_b(0) <= ena_b;
+          for i in 1 to g_OUT_PIPELINE loop
+            ena_pipes_b(i) <= ena_pipes_b(i-1);
+          end loop;
         end if;
       end process ena_b0;
 
-      ena_a_pl: if g_OUT_PIPELINE > 1 generate
-        process(clk) begin
-          if rising_edge(clk) then
-            for i in 1 to g_OUT_PIPELINE loop
-              ena_pipes_a(i) <= ena_pipes_a(i-1);
-            end loop;
-          end if;
-        end process;
-      end generate ena_a_pl;
+      -- ena_a_pl: if g_OUT_PIPELINE >= 1 generate
+        -- process(clk) begin
+        --   if rising_edge(clk) then
+        --     for i in 1 to g_OUT_PIPELINE loop
+        --       ena_pipes_a(i) <= ena_pipes_a(i-1);
+        --     end loop;
+        --   end if;
+        -- end process;
+      -- end generate ena_a_pl;
 
-      ena_b_pl: if g_OUT_PIPELINE > 1 generate
-        process(clk) begin
-          if rising_edge(clk) then
-            for i in 1 to g_OUT_PIPELINE loop
-              ena_pipes_b(i) <= ena_pipes_b(i-1);
-            end loop;
-          end if;
-        end process;
-      end generate ena_b_pl;
+      -- ena_b_pl: if g_OUT_PIPELINE >= 1 generate
+      --   process(clk) begin
+      --     if rising_edge(clk) then
+      --       for i in 1 to g_OUT_PIPELINE loop
+      --         ena_pipes_b(i) <= ena_pipes_b(i-1);
+      --       end loop;
+      --     end if;
+      --   end process;
+      -- end generate ena_b_pl;
 
       -- data pl
       proc0_A: process(clk)
