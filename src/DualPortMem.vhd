@@ -35,11 +35,11 @@ entity DualPortMem is
     i_addr_a    : in std_logic_vector(g_ADD_WIDTH-1 downto 0);
     i_din_a     : in std_logic_vector(g_RAM_WIDTH-1 downto 0);
     i_wr_nrd_a  : in  std_logic;
-    o_dout_a    : out std_logic_vector(g_RAM_WIDTH-1 downto 0);
+    o_dout_a    : out std_logic_vector(g_RAM_WIDTH-1 downto 0) := (others => '0');
     -- Port B
     ena_b : in std_logic;
     i_addr_b    : in std_logic_vector(g_ADD_WIDTH-1 downto 0);
-    i_din_b     : in std_logic_vector(g_RAM_WIDTH-1 downto 0);
+    i_din_b     : in std_logic_vector(g_RAM_WIDTH-1 downto 0) := (others => '0');
     i_wr_nrd_b  : in  std_logic;
     o_dout_b    : out std_logic_vector(g_RAM_WIDTH-1 downto 0)
   );
