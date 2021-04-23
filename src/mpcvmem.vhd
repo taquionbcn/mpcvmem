@@ -413,7 +413,7 @@ begin
       begin
         if rising_edge(clk) then
           if (ena_pipes_b(0) = '1') then
-            data_pipes_B(0) <= mem_out_a;
+            data_pipes_B(0) <= mem_out_b;
             for j in 1 to g_OUT_PIPELINE-1 loop
               if (ena_pipes_b(j) = '1') then
                 data_pipes_B(j) <= data_pipes_B(j-1);
