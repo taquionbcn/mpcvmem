@@ -78,8 +78,9 @@ architecture beh of mpcvmem is
       g_MEMORY_TYPE         : string := "distributed";
       g_ENABLE_SECOND_PORT  : std_logic := '0';
       -- g_OUT_PIPELINE        : integer := 0;
-      g_RAM_WIDTH           : integer := 8;
-      g_ADD_WIDTH           : integer := 8
+      g_RAM_WIDTH           : integer := 0;
+      g_ADD_WIDTH           : integer := 0;
+      g_RAM_DEPTH           : integer := 0
     );
     port (
       clk : in std_logic;
@@ -109,11 +110,31 @@ architecture beh of mpcvmem is
     end if;
     return y;
   end function;
+  function init_mem_depth(m : integer; x : integer) return integer is
+    variable y : integer;
+  begin
+    if m /= 0 then
+      y := m;
+    else
+      y := 2**x;
+    end if;
+    return y;
+  end function;
+  -- function init_add_width(m : integer; x : integer) return integer is
+  --   variable y : integer;
+  -- begin
+  --   if m /= 0 then
+  --     y := ceil(log2(real(g_MEM_DEPTH)));
+  --   else
+  --     y := x;
+  --   end if;
+  --   return y;
+  -- end function;
   --------------------------------
   -- constants
   --------------------------------
   constant ADD_WIDTH : integer := integer(ceil(log2(real(g_MEM_DEPTH))));
-  constant MEM_DEPTH : integer := 2**ADD_WIDTH;
+  constant MEM_DEPTH : integer := init_mem_depth(g_MEM_DEPTH,ADD_WIDTH);
   constant MEM_WIDTH : integer := init_mem_width(g_MEM_WIDTH,g_DV_TYPE);--g_MEM_WIDTH + 1;
   --------------------------------
   -- signals
@@ -210,7 +231,7 @@ begin
   end generate MON_GEN;
   
   PIPE_GEN : if g_LOGIC_TYPE = "pipeline" generate
-    constant PL_DELAY : integer := g_MEM_DEPTH;
+    constant PL_DELAY : integer := g_PL_DELAY_CYCLES;
     -- constant MEM_DEPTH : integer := 2**ADD_WIDTH;
   begin
 
@@ -222,7 +243,8 @@ begin
           g_ENABLE_SECOND_PORT => '1',
           -- g_OUT_PIPELINE => 2,
           g_RAM_WIDTH => MEM_WIDTH,
-          g_ADD_WIDTH => ADD_WIDTH
+          g_ADD_WIDTH => ADD_WIDTH,
+          g_RAM_DEPTH => MEM_DEPTH
         )
         port map(
           clk         => clk,
