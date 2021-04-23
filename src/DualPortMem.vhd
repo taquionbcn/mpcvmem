@@ -59,7 +59,7 @@ architecture beh of DualPortMem is
 
   type mem_ram_t is array (init_mem_depth(g_RAM_DEPTH,g_ADD_WIDTH) downto 0) of std_logic_vector(g_RAM_WIDTH-1 downto 0);	
   -- type mem_ram_t is array (2**g_ADD_WIDTH-1 downto 0) of std_logic_vector(g_RAM_WIDTH-1 downto 0);	
-  signal mem : mem_ram_t;
+  signal mem : mem_ram_t := (others => (others => '0'));
 
   attribute RAM_STYLE : string;
   attribute RAM_STYLE of mem : signal is "ultra";--g_MEMORY_TYPE;
