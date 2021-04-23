@@ -235,7 +235,10 @@ begin
   PIPE_GEN : if g_LOGIC_TYPE = "pipeline" generate
     constant PL_DELAY : integer := g_PL_DELAY_CYCLES;
     -- constant MEM_DEPTH : integer := 2**ADD_WIDTH;
+
   begin
+
+    -- mem_in_b <= (others => '0');
 
     PL_ULTRA: if g_MEMORY_TYPE = "ultra" generate
 
@@ -261,7 +264,7 @@ begin
           -- Port B 
           ena_b         => ena_b,
           i_addr_b     => mem_addr_b,--std_logic_vector(to_unsigned(mem_addr_b));
-          i_din_b      => mem_in_b,
+          i_din_b      => (others => '0'),--mem_in_b,
           i_wr_nrd_b   => '0',
           o_dout_b     => mem_out_b
         )
