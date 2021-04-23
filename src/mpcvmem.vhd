@@ -18,7 +18,7 @@ use ieee.math_real.all;
 
 entity mpcvmem is
   generic(
-    g_SIMULATION          : std_logic := '0';
+    g_SIMULATION          : std_logic := '0'; -- deprecated( only was to force proper simulation in vivado)
     --
     g_LOGIC_TYPE          : string := "fifo"; -- fifo, pipeline, ram
     g_READ_MODE           : string := "normal"; -- normal , read_ahead
@@ -43,6 +43,7 @@ entity mpcvmem is
     ena                   : in std_logic := '1';
     --
     i_freeze              : in std_logic := '0';
+    i_ext_ctrl            : in std_logic := '0';
     -- Port A
     i_addr_a              : in  std_logic_vector(integer(ceil(log2(real(g_MEM_DEPTH))))-1 downto 0):= (others => '0');
     i_din_a               : in  std_logic_vector(g_MEM_WIDTH - 1 downto 0) := (others => '0');
@@ -76,6 +77,7 @@ architecture beh of mpcvmem is
   component DualPortMem is
     generic(
       g_MEMORY_TYPE         : string := "distributed";
+      g_MEMORY_STRUCTURE    : string := "SDP";
       g_ENABLE_SECOND_PORT  : std_logic := '0';
       -- g_OUT_PIPELINE        : integer := 0;
       g_RAM_WIDTH           : integer := 0;
@@ -102,7 +104,7 @@ architecture beh of mpcvmem is
 
   function init_mem_width(m : integer; x : string) return integer is
     variable y : integer;
-  begin
+    begin
     if x = "int" then
       y := m + 1;
     else
@@ -112,7 +114,7 @@ architecture beh of mpcvmem is
   end function;
   function init_mem_depth(m : integer; x : integer) return integer is
     variable y : integer;
-  begin
+    begin
     if m /= 0 then
       y := m;
     else
@@ -216,7 +218,7 @@ begin
     --   if rising_edge(clk) then
     --     if i_dv_in_a = '1' then
           mem_in_a <= i_din_a & i_dv_in_a;
-          mem_in_b <= i_din_b & i_dv_in_b;
+          -- mem_in_b <= i_din_b & i_dv_in_b;
     --     else
     --       mem_in_a <= (others => '0');
     --     end if;
@@ -240,6 +242,7 @@ begin
       RAM_MEM : DualPortMem
         generic map(
           g_MEMORY_TYPE => g_MEMORY_TYPE,
+          g_MEMORY_STRUCTURE => "SDP",
           g_ENABLE_SECOND_PORT => '1',
           -- g_OUT_PIPELINE => 2,
           g_RAM_WIDTH => MEM_WIDTH,
@@ -324,7 +327,7 @@ begin
           wr_index_aux <= get_write_index(wr_index_aux,1);
           rd_index_aux <= get_read_index(rd_index_aux,wr_index_aux + 1,PL_DELAY);
           
-          if i_dv_in_b = '0' then -- normal
+          if i_freeze = '0' then -- normal
             wr_index <= get_write_index(wr_index_aux,0);
             rd_index <= get_read_index(rd_index_aux,wr_index_aux + 1,PL_DELAY);
           else -- external
@@ -366,14 +369,14 @@ begin
 
     OUT_PL_GEN: if g_OUT_PIPELINE > 0 generate
       -- enable pl
-      ena_a0: process(clk) begin
-        if rising_edge(clk) then
-          ena_pipes_a(0) <= ena_a;
-          for i in 1 to g_OUT_PIPELINE loop
-            ena_pipes_a(i) <= ena_pipes_a(i-1);
-          end loop;
-        end if;
-      end process ena_a0;      
+      -- ena_a0: process(clk) begin
+      --   if rising_edge(clk) then
+      --     ena_pipes_a(0) <= ena_a;
+      --     for i in 1 to g_OUT_PIPELINE loop
+      --       ena_pipes_a(i) <= ena_pipes_a(i-1);
+      --     end loop;
+      --   end if;
+      -- end process ena_a0;      
       
       ena_b0: process(clk) begin
         if rising_edge(clk) then
@@ -384,47 +387,27 @@ begin
         end if;
       end process ena_b0;
 
-      -- ena_a_pl: if g_OUT_PIPELINE >= 1 generate
-        -- process(clk) begin
-        --   if rising_edge(clk) then
-        --     for i in 1 to g_OUT_PIPELINE loop
-        --       ena_pipes_a(i) <= ena_pipes_a(i-1);
-        --     end loop;
-        --   end if;
-        -- end process;
-      -- end generate ena_a_pl;
-
-      -- ena_b_pl: if g_OUT_PIPELINE >= 1 generate
-      --   process(clk) begin
-      --     if rising_edge(clk) then
-      --       for i in 1 to g_OUT_PIPELINE loop
-      --         ena_pipes_b(i) <= ena_pipes_b(i-1);
+      -- data pl
+      -- proc0_A: process(clk)
+      -- begin
+      --   if rising_edge(clk) then
+      --     if (ena_pipes_a(0) = '1') then
+      --       data_pipes_A(0) <= mem_out_b;
+      --       for j in 1 to g_OUT_PIPELINE-1 loop
+      --         if (ena_pipes_a(j) = '1') then
+      --             data_pipes_A(j) <= data_pipes_A(j-1);
+      --         end if;
       --       end loop;
       --     end if;
-      --   end process;
-      -- end generate ena_b_pl;
-
-      -- data pl
-      proc0_A: process(clk)
-      begin
-        if rising_edge(clk) then
-          if (ena_pipes_a(0) = '1') then
-            data_pipes_A(0) <= mem_out_b;
-            for j in 1 to g_OUT_PIPELINE-1 loop
-              if (ena_pipes_a(j) = '1') then
-                  data_pipes_A(j) <= data_pipes_A(j-1);
-              end if;
-            end loop;
-          end if;
-          if (rst = '1') then
-            o_dout_a <= (others => '0');
-            o_dv_out_a <= '0';
-          elsif (ena_pipes_a(g_OUT_PIPELINE) = '1') then
-            o_dout_a <= data_pipes_A(g_OUT_PIPELINE-1)(MEM_WIDTH -1 downto 1);
-            o_dv_out_a <= data_pipes_A(g_OUT_PIPELINE-1)(0);
-          end if;
-        end if;
-      end process proc0_A;
+      --     if (rst = '1') then
+      --       o_dout_a <= (others => '0');
+      --       o_dv_out_a <= '0';
+      --     elsif (ena_pipes_a(g_OUT_PIPELINE) = '1') then
+      --       o_dout_a <= data_pipes_A(g_OUT_PIPELINE-1)(MEM_WIDTH -1 downto 1);
+      --       o_dv_out_a <= data_pipes_A(g_OUT_PIPELINE-1)(0);
+      --     end if;
+      --   end if;
+      -- end process proc0_A;
 
       proc0_B: process(clk)
       begin

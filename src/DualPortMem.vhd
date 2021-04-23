@@ -19,7 +19,7 @@ use ieee.math_real.all;
 entity DualPortMem is
   generic(
     g_MEMORY_TYPE         : string := "distributed";
-    g_MEMORY_STRUCTURE    : string := "SDP"
+    g_MEMORY_STRUCTURE    : string := "SDP";
     g_ENABLE_SECOND_PORT  : std_logic := '0';
 
     -- g_OUT_PIPELINE        : integer := 0;
