@@ -16,6 +16,8 @@ use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 use ieee.math_real.all;
 
+library mpcvmem_lib;
+
 entity mpcvmem is
   generic(
     g_SIMULATION          : std_logic := '0'; -- deprecated( only was to force proper simulation in vivado)
@@ -74,33 +76,33 @@ architecture beh of mpcvmem is
   --------------------------------
   -- components
   --------------------------------
-  component DualPortMem is
-    generic(
-      g_MEMORY_TYPE         : string := "distributed";
-      g_MEMORY_STRUCTURE    : string := "SDP";
-      g_ENABLE_SECOND_PORT  : std_logic := '0';
-      -- g_OUT_PIPELINE        : integer := 0;
-      g_RAM_WIDTH           : integer := 0;
-      g_ADD_WIDTH           : integer := 0;
-      g_RAM_DEPTH           : integer := 0
-    );
-    port (
-      clk : in std_logic;
-      rst : in std_logic;
-      -- Port A
-      ena_a : in std_logic;
-      i_addr_a    : in std_logic_vector(g_ADD_WIDTH-1 downto 0);
-      i_din_a     : in std_logic_vector(g_RAM_WIDTH-1 downto 0);
-      i_wr_nrd_a  : in  std_logic;
-      o_dout_a    : out std_logic_vector(g_RAM_WIDTH-1 downto 0);
-      -- Port B
-      ena_b : in std_logic;
-      i_addr_b    : in std_logic_vector(g_ADD_WIDTH-1 downto 0);
-      i_din_b     : in std_logic_vector(g_RAM_WIDTH-1 downto 0);
-      i_wr_nrd_b  : in  std_logic;
-      o_dout_b    : out std_logic_vector(g_RAM_WIDTH-1 downto 0)
-    );
-  end component DualPortMem;
+  -- component DualPortMem is
+  --   generic(
+  --     g_MEMORY_TYPE         : string := "distributed";
+  --     g_MEMORY_STRUCTURE    : string := "SDP";
+  --     g_ENABLE_SECOND_PORT  : std_logic := '0';
+  --     -- g_OUT_PIPELINE        : integer := 0;
+  --     g_RAM_WIDTH           : integer := 0;
+  --     g_ADD_WIDTH           : integer := 0;
+  --     g_RAM_DEPTH           : integer := 0
+  --   );
+  --   port (
+  --     clk : in std_logic;
+  --     rst : in std_logic;
+  --     -- Port A
+  --     ena_a : in std_logic;
+  --     i_addr_a    : in std_logic_vector(g_ADD_WIDTH-1 downto 0);
+  --     i_din_a     : in std_logic_vector(g_RAM_WIDTH-1 downto 0);
+  --     i_wr_nrd_a  : in  std_logic;
+  --     o_dout_a    : out std_logic_vector(g_RAM_WIDTH-1 downto 0) := (others => '0');
+  --     -- Port B
+  --     ena_b : in std_logic;
+  --     i_addr_b    : in std_logic_vector(g_ADD_WIDTH-1 downto 0);
+  --     i_din_b     : in std_logic_vector(g_RAM_WIDTH-1 downto 0);-- := (others => '0');
+  --     i_wr_nrd_b  : in  std_logic;
+  --     o_dout_b    : out std_logic_vector(g_RAM_WIDTH-1 downto 0)
+  --   );
+  -- end component DualPortMem;
 
   function init_mem_width(m : integer; x : string) return integer is
     variable y : integer;
@@ -242,7 +244,7 @@ begin
 
     PL_ULTRA: if g_MEMORY_TYPE = "ultra" generate
 
-      RAM_MEM : DualPortMem
+      RAM_MEM : entity mpcvmem_lib.DualPortMem
         generic map(
           g_MEMORY_TYPE => g_MEMORY_TYPE,
           g_MEMORY_STRUCTURE => "SDP",
@@ -264,7 +266,7 @@ begin
           -- Port B 
           ena_b         => ena_b,
           i_addr_b     => mem_addr_b,--std_logic_vector(to_unsigned(mem_addr_b));
-          i_din_b      => (others => '0'),--mem_in_b,
+          -- i_din_b      => open,--(others => '0'),--mem_in_b,
           i_wr_nrd_b   => '0',
           o_dout_b     => mem_out_b
         )

@@ -16,6 +16,8 @@ use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 use ieee.math_real.all;
 
+library mpcvmem_lib;
+
 entity DualPortMem is
   generic(
     g_MEMORY_TYPE         : string := "distributed";
@@ -31,13 +33,13 @@ entity DualPortMem is
     clk : in std_logic;
     rst : in std_logic;
     -- Port A
-    ena_a : in std_logic;
+    ena_a       : in std_logic;
     i_addr_a    : in std_logic_vector(g_ADD_WIDTH-1 downto 0);
     i_din_a     : in std_logic_vector(g_RAM_WIDTH-1 downto 0);
     i_wr_nrd_a  : in  std_logic;
     o_dout_a    : out std_logic_vector(g_RAM_WIDTH-1 downto 0) := (others => '0');
     -- Port B
-    ena_b : in std_logic;
+    ena_b       : in std_logic;
     i_addr_b    : in std_logic_vector(g_ADD_WIDTH-1 downto 0);
     i_din_b     : in std_logic_vector(g_RAM_WIDTH-1 downto 0) := (others => '0');
     i_wr_nrd_b  : in  std_logic;

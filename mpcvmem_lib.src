@@ -1,0 +1,3 @@
+shared/vhdl_amc/mpcvmem/pkg/mpcvmem_pkg.vhd
+shared/vhdl_amc/mpcvmem/src/mpcvmem.vhd
+shared/vhdl_amc/mpcvmem/src/DualPortMem.vhd
