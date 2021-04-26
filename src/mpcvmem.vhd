@@ -258,13 +258,13 @@ begin
           clk         => clk,
           rst         => rst,
           -- Port A
-          ena_a         => ena_a,
+          ena_a        => ena_a,
           i_addr_a     => mem_addr_a,--std_logic_vector(to_unsigned(mem_addr_a)); 
           i_din_a      => mem_in_a,
           i_wr_nrd_a   => '1',
           o_dout_a     => mem_out_a,
           -- Port B 
-          ena_b         => ena_b,
+          ena_b        => ena_b,
           i_addr_b     => mem_addr_b,--std_logic_vector(to_unsigned(mem_addr_b));
           -- i_din_b      => open,--(others => '0'),--mem_in_b,
           i_wr_nrd_b   => '0',
