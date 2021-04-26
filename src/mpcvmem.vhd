@@ -51,7 +51,7 @@ entity mpcvmem is
     i_din_a               : in  std_logic_vector(g_MEM_WIDTH - 1 downto 0) := (others => '0');
     i_dv_in_a             : in  std_logic := '1';
     o_dout_a              : out std_logic_vector(g_MEM_WIDTH - 1 downto 0);
-    o_dv_out_a             : out std_logic := '1';
+    o_dv_out_a            : out std_logic := '1';
 
     -- Port B
     i_addr_b              : in  std_logic_vector(integer(ceil(log2(real(g_MEM_DEPTH))))-1 downto 0):= (others => '0');
@@ -266,7 +266,7 @@ begin
           -- Port B 
           ena_b        => ena_b,
           i_addr_b     => mem_addr_b,--std_logic_vector(to_unsigned(mem_addr_b));
-          -- i_din_b      => open,--(others => '0'),--mem_in_b,
+          i_din_b      => (others => '0'),--mem_in_b,
           i_wr_nrd_b   => '0',
           o_dout_b     => mem_out_b
         )
