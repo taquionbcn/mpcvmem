@@ -66,7 +66,7 @@ entity mpcvmem is
     o_full                : out std_logic;
     o_full_next           : out std_logic;
     -- used counter
-    o_used                : out integer range integer(log2(real(g_MEM_DEPTH))) - 1 downto 0
+    o_used                : out integer --range integer(log2(real(g_MEM_DEPTH))) - 1 downto 0
     -- The delay can be changed by the offset and resetting the module
     -- i_delay               : in integer range g_RAM_DEPTH - 1 downto 0 := g_RAM_DEPTH-1  
   );
