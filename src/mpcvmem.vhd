@@ -231,9 +231,9 @@ begin
   end generate NO_IN_PL_GEN;
 
   ena_a <= ena;
-  MON_GEN: if g_SECOND_PORT /= "none" generate
+  -- MON_GEN: if g_SECOND_PORT /= "none" generate
     ena_b <= ena;
-  end generate MON_GEN;
+  -- end generate MON_GEN;
   
   PIPE_GEN : if g_LOGIC_TYPE = "pipeline" generate
     constant PL_DELAY : integer := g_PL_DELAY_CYCLES;
