@@ -34,7 +34,7 @@ entity mpcvmem is
     -- RAM
     -- IN/OUT PARAMETERS
     g_IN_PIPELINE         : natural := 0;
-    g_OUT_PIPELINE        : natural := 2;
+    g_OUT_PIPELINE        : natural := 0;
     -- MEMORY PARAMETERS
     g_MEM_WIDTH           : integer := 8;
     g_MEM_DEPTH           : integer := 8     -- maximum depth of the ram, also the maximum delay
@@ -387,9 +387,11 @@ begin
       ena_b0: process(clk) begin
         if rising_edge(clk) then
           ena_pipes_b(0) <= ena_b;
-          for i in 1 to g_OUT_PIPELINE loop
-            ena_pipes_b(i) <= ena_pipes_b(i-1);
-          end loop;
+          if g_OUT_PIPELINE > 1 then
+            for i in 1 to g_OUT_PIPELINE loop
+              ena_pipes_b(i) <= ena_pipes_b(i-1);
+            end loop;
+          end if;
         end if;
       end process ena_b0;
 
@@ -418,18 +420,22 @@ begin
       proc0_B: process(clk)
       begin
         if rising_edge(clk) then
+          -- data pipleine
           if (ena_pipes_b(0) = '1') then
             data_pipes_B(0) <= mem_out_b;
-            for j in 1 to g_OUT_PIPELINE-1 loop
-              if (ena_pipes_b(j) = '1') then
-                data_pipes_B(j) <= data_pipes_B(j-1);
-              end if;
-            end loop;
+            if g_OUT_PIPELINE > 1 then
+              for j in 1 to g_OUT_PIPELINE-1 loop
+                if (ena_pipes_b(j) = '1') then
+                  data_pipes_B(j) <= data_pipes_B(j-1);
+                end if;
+              end loop;
+            end if;
           end if;
+          -- data out 
           if (rst = '1') then
             o_dout_b <= (others => '0');
             o_dv_out_b <= '0';
-          elsif (ena_pipes_b(g_OUT_PIPELINE) = '1') then
+          elsif (ena_pipes_b(g_OUT_PIPELINE - 1) = '1') then
             o_dout_b <= data_pipes_B(g_OUT_PIPELINE-1)(MEM_WIDTH -1 downto 1);
             o_dv_out_b <= data_pipes_B(g_OUT_PIPELINE-1)(0);
           end if;
