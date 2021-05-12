@@ -27,6 +27,7 @@ entity mpcvmem is
     g_MEMORY_TYPE         : string := "auto"; -- auto, ultra, block, distributed
     g_DV_TYPE             : string := "int"; -- int , ext
     -- MEMORY PARAMETERS
+    g_MEMORY_STRUCTURE    : string := "SDP";
     g_SECOND_PORT         : string := "none"; -- none, normal, monitor
     -- FIFO 
     -- PIPELINE
@@ -74,36 +75,6 @@ entity mpcvmem is
 end entity mpcvmem;
 
 architecture beh of mpcvmem is
-  --------------------------------
-  -- components
-  --------------------------------
-  -- component DualPortMem is
-  --   generic(
-  --     g_MEMORY_TYPE         : string := "distributed";
-  --     g_MEMORY_STRUCTURE    : string := "SDP";
-  --     g_ENABLE_SECOND_PORT  : std_logic := '0';
-  --     -- g_OUT_PIPELINE        : integer := 0;
-  --     g_RAM_WIDTH           : integer := 0;
-  --     g_ADD_WIDTH           : integer := 0;
-  --     g_RAM_DEPTH           : integer := 0
-  --   );
-  --   port (
-  --     clk : in std_logic;
-  --     rst : in std_logic;
-  --     -- Port A
-  --     ena_a : in std_logic;
-  --     i_addr_a    : in std_logic_vector(g_ADD_WIDTH-1 downto 0);
-  --     i_din_a     : in std_logic_vector(g_RAM_WIDTH-1 downto 0);
-  --     i_wr_nrd_a  : in  std_logic;
-  --     o_dout_a    : out std_logic_vector(g_RAM_WIDTH-1 downto 0) := (others => '0');
-  --     -- Port B
-  --     ena_b : in std_logic;
-  --     i_addr_b    : in std_logic_vector(g_ADD_WIDTH-1 downto 0);
-  --     i_din_b     : in std_logic_vector(g_RAM_WIDTH-1 downto 0);-- := (others => '0');
-  --     i_wr_nrd_b  : in  std_logic;
-  --     o_dout_b    : out std_logic_vector(g_RAM_WIDTH-1 downto 0)
-  --   );
-  -- end component DualPortMem;
 
   function init_mem_width(m : integer; x : string) return integer is
     variable y : integer;
@@ -145,8 +116,8 @@ architecture beh of mpcvmem is
   -- signals
   --------------------------------
   signal ena_a, ena_b : std_logic;
-  signal ena_pipes_a : std_logic_vector(g_OUT_PIPELINE downto 0);
-  signal ena_pipes_b : std_logic_vector(g_OUT_PIPELINE downto 0);
+  signal ena_pipes_a : std_logic_vector(g_OUT_PIPELINE - 1 downto 0);
+  signal ena_pipes_b : std_logic_vector(g_OUT_PIPELINE - 1 downto 0);
   type my_pipes is array (g_OUT_PIPELINE-1 downto 0) of std_logic_vector(MEM_WIDTH-1 downto 0);
   signal data_pipes_A : my_pipes;
   signal data_pipes_B : my_pipes;
@@ -229,11 +200,6 @@ begin
     -- end process in_ctrl_NO;
     
   end generate NO_IN_PL_GEN;
-
-  ena_a <= ena;
-  -- MON_GEN: if g_SECOND_PORT /= "none" generate
-    ena_b <= ena;
-  -- end generate MON_GEN;
   
   PIPE_GEN : if g_LOGIC_TYPE = "pipeline" generate
     constant PL_DELAY : integer := g_PL_DELAY_CYCLES;
@@ -242,43 +208,8 @@ begin
   begin
 
     -- mem_in_b <= (others => '0');
-
-    PL_ULTRA: if g_MEMORY_TYPE = "ultra" generate
-
-      RAM_MEM : entity mpcvmem_lib.DualPortMem
-        generic map(
-          g_MEMORY_TYPE => g_MEMORY_TYPE,
-          g_MEMORY_STRUCTURE => "SDP",
-          g_ENABLE_SECOND_PORT => '1',
-          -- g_OUT_PIPELINE => 2,
-          g_RAM_WIDTH => MEM_WIDTH,
-          g_ADD_WIDTH => ADD_WIDTH,
-          g_RAM_DEPTH => MEM_DEPTH
-        )
-        port map(
-          clk         => clk,
-          rst         => rst,
-          -- Port A
-          ena_a        => ena_a,
-          i_addr_a     => mem_addr_a,--std_logic_vector(to_unsigned(mem_addr_a)); 
-          i_din_a      => mem_in_a,
-          i_wr_nrd_a   => '1',
-          o_dout_a     => mem_out_a,
-          -- Port B 
-          ena_b        => ena_b,
-          i_addr_b     => mem_addr_b,--std_logic_vector(to_unsigned(mem_addr_b));
-          i_din_b      => (others => '0'),--mem_in_b,
-          i_wr_nrd_b   => '0',
-          o_dout_b     => mem_out_b
-        )
-      ;
-
-    end generate PL_ULTRA;
-
-
     mem_addr_a <= std_logic_vector(to_unsigned( wr_index , ADD_WIDTH ));
     mem_addr_b <=std_logic_vector(to_unsigned( rd_index , ADD_WIDTH ));
-
 
     MEM_CTRL: process(clk) begin
       if rising_edge(clk) then
@@ -349,7 +280,6 @@ begin
     --------------------------------
     -- PIPELINES CTRL
     --------------------------------
-
     NO_OUT_PL_GEN: if g_OUT_PIPELINE = 0 generate
       -- 1 clk latency
       data_no_pl: process(clk)
@@ -373,77 +303,292 @@ begin
       -- o_dout_a <= mem_out_b;
     end generate NO_OUT_PL_GEN;
 
-    OUT_PL_GEN: if g_OUT_PIPELINE > 0 generate
-      -- enable pl
-      -- ena_a0: process(clk) begin
-      --   if rising_edge(clk) then
-      --     ena_pipes_a(0) <= ena_a;
-      --     for i in 1 to g_OUT_PIPELINE loop
-      --       ena_pipes_a(i) <= ena_pipes_a(i-1);
-      --     end loop;
-      --   end if;
-      -- end process ena_a0;      
-      
-      ena_b0: process(clk) begin
-        if rising_edge(clk) then
-          ena_pipes_b(0) <= ena_b;
-          if g_OUT_PIPELINE > 1 then
-            for i in 1 to g_OUT_PIPELINE loop
-              ena_pipes_b(i) <= ena_pipes_b(i-1);
-            end loop;
-          end if;
-        end if;
-      end process ena_b0;
+    SDP: if g_MEMORY_STRUCTURE = "SDP" generate
+      PL_ULTRA: if g_MEMORY_TYPE = "ultra" generate
 
-      -- data pl
-      -- proc0_A: process(clk)
-      -- begin
-      --   if rising_edge(clk) then
-      --     if (ena_pipes_a(0) = '1') then
-      --       data_pipes_A(0) <= mem_out_b;
-      --       for j in 1 to g_OUT_PIPELINE-1 loop
-      --         if (ena_pipes_a(j) = '1') then
-      --             data_pipes_A(j) <= data_pipes_A(j-1);
-      --         end if;
-      --       end loop;
-      --     end if;
-      --     if (rst = '1') then
-      --       o_dout_a <= (others => '0');
-      --       o_dv_out_a <= '0';
-      --     elsif (ena_pipes_a(g_OUT_PIPELINE) = '1') then
-      --       o_dout_a <= data_pipes_A(g_OUT_PIPELINE-1)(MEM_WIDTH -1 downto 1);
-      --       o_dv_out_a <= data_pipes_A(g_OUT_PIPELINE-1)(0);
-      --     end if;
-      --   end if;
-      -- end process proc0_A;
+        RAM_MEM : entity mpcvmem_lib.DualPortMem
+          generic map(
+            g_MEMORY_TYPE => g_MEMORY_TYPE,
+            g_MEMORY_STRUCTURE => "SDP",
+            g_ENABLE_SECOND_PORT => '1',
+            -- g_OUT_PIPELINE => 2,
+            g_RAM_WIDTH => MEM_WIDTH,
+            g_ADD_WIDTH => ADD_WIDTH,
+            g_RAM_DEPTH => MEM_DEPTH
+          )
+          port map(
+            clk         => clk,
+            rst         => rst,
+            -- Port A
+            ena_a        => ena_a,
+            i_addr_a     => mem_addr_a,--std_logic_vector(to_unsigned(mem_addr_a)); 
+            i_din_a      => mem_in_a,
+            i_wr_nrd_a   => '1',
+            o_dout_a     => mem_out_a,
+            -- Port B 
+            ena_b        => ena_b,
+            i_addr_b     => mem_addr_b,--std_logic_vector(to_unsigned(mem_addr_b));
+            i_din_b      => (others => '0'),--mem_in_b,
+            i_wr_nrd_b   => '0',
+            o_dout_b     => mem_out_b
+          );
+      end generate PL_ULTRA;
 
-      proc0_B: process(clk)
-      begin
-        if rising_edge(clk) then
-          -- data pipleine
-          if (ena_pipes_b(0) = '1') then
-            data_pipes_B(0) <= mem_out_b;
+      ena_a <= ena;
+
+      OUT_PL_GEN: if g_OUT_PIPELINE > 0 generate
+   
+        ena_b0: process(clk) begin
+          if rising_edge(clk) then
+            ena_pipes_b(0) <= ena_b;
             if g_OUT_PIPELINE > 1 then
-              for j in 1 to g_OUT_PIPELINE-1 loop
-                if (ena_pipes_b(j) = '1') then
-                  data_pipes_B(j) <= data_pipes_B(j-1);
-                end if;
+              for i in 1 to g_OUT_PIPELINE - 1 loop
+                ena_pipes_b(i) <= ena_pipes_b(i-1);
               end loop;
             end if;
           end if;
-          -- data out 
-          if (rst = '1') then
-            o_dout_b <= (others => '0');
-            o_dv_out_b <= '0';
-          elsif (ena_pipes_b(g_OUT_PIPELINE - 1) = '1') then
-            o_dout_b <= data_pipes_B(g_OUT_PIPELINE-1)(MEM_WIDTH -1 downto 1);
-            o_dv_out_b <= data_pipes_B(g_OUT_PIPELINE-1)(0);
+        end process ena_b0;
+  
+        proc0_B: process(clk)
+        begin
+          if rising_edge(clk) then
+            -- data pipleine
+            if (ena_pipes_b(0) = '1') then
+              data_pipes_B(0) <= mem_out_b;
+              if g_OUT_PIPELINE > 1 then
+                for j in 1 to g_OUT_PIPELINE-1 loop
+                  if (ena_pipes_b(j) = '1') then
+                    data_pipes_B(j) <= data_pipes_B(j-1);
+                  end if;
+                end loop;
+              end if;
+            end if;
+            -- data out 
+            if (rst = '1') then
+              o_dout_b <= (others => '0');
+              o_dv_out_b <= '0';
+            elsif (ena_pipes_b(g_OUT_PIPELINE - 1) = '1') then
+              o_dout_b <= data_pipes_B(g_OUT_PIPELINE-1)(MEM_WIDTH -1 downto 1);
+              o_dv_out_b <= data_pipes_B(g_OUT_PIPELINE-1)(0);
+            end if;
           end if;
-        end if;
-      end process proc0_B;
-      
+        end process proc0_B;
+        
+  
+      end generate OUT_PL_GEN;
+    end generate;
 
-    end generate OUT_PL_GEN;
+    TDP: if g_MEMORY_STRUCTURE = "TDP" generate
+      PL_ULTRA: if g_MEMORY_TYPE = "ultra" generate
+
+        RAM_MEM : entity mpcvmem_lib.DualPortMem
+          generic map(
+            g_MEMORY_TYPE => g_MEMORY_TYPE,
+            g_MEMORY_STRUCTURE => "SDP",
+            g_ENABLE_SECOND_PORT => '1',
+            -- g_OUT_PIPELINE => 2,
+            g_RAM_WIDTH => MEM_WIDTH,
+            g_ADD_WIDTH => ADD_WIDTH,
+            g_RAM_DEPTH => MEM_DEPTH
+          )
+          port map(
+            clk         => clk,
+            rst         => rst,
+            -- Port A
+            ena_a        => ena_a,
+            i_addr_a     => mem_addr_a,--std_logic_vector(to_unsigned(mem_addr_a)); 
+            i_din_a      => mem_in_a,
+            i_wr_nrd_a   => '1',
+            o_dout_a     => mem_out_a,
+            -- Port B 
+            ena_b        => ena_b,
+            i_addr_b     => mem_addr_b,--std_logic_vector(to_unsigned(mem_addr_b));
+            i_din_b      => (others => '0'),--mem_in_b,
+            i_wr_nrd_b   => '0',
+            o_dout_b     => mem_out_b
+          );
+      end generate PL_ULTRA;
+
+      ena_a <= ena;
+      ena_b <= ena;
+
+      NO_OUT_PL_GEN: if g_OUT_PIPELINE = 0 generate
+        -- 1 clk latency
+        data_no_pl: process(clk)
+        begin
+          if rising_edge(clk) then
+            if rst = '1' then
+              o_dout_a <= (others => '0');        
+              o_dout_b <= (others => '0');  
+              o_dv_out_a <= '0';
+              o_dv_out_b <= '0';      
+            else
+              o_dout_a <= mem_out_a;        
+              o_dout_b <= mem_out_b;  
+              o_dv_out_a <= mem_out_a(0);
+              o_dv_out_b <= mem_out_b(0); 
+            end if;
+          end if;
+        end process data_no_pl;
+  
+        -- 0 clk latency
+        -- o_dout_a <= mem_out_b;
+      end generate NO_OUT_PL_GEN;
+  
+      
+  
+      OUT_PL_GEN: if g_OUT_PIPELINE > 0 generate
+        -- enable pl
+        -- ena_a0: process(clk) begin
+        --   if rising_edge(clk) then
+        --     ena_pipes_a(0) <= ena_a;
+        --     for i in 1 to g_OUT_PIPELINE loop
+        --       ena_pipes_a(i) <= ena_pipes_a(i-1);
+        --     end loop;
+        --   end if;
+        -- end process ena_a0;      
+        
+        ena_b0: process(clk) begin
+          if rising_edge(clk) then
+            ena_pipes_b(0) <= ena_b;
+            if g_OUT_PIPELINE > 1 then
+              for i in 1 to g_OUT_PIPELINE - 1 loop
+                ena_pipes_b(i) <= ena_pipes_b(i-1);
+              end loop;
+            end if;
+          end if;
+        end process ena_b0;
+  
+        -- data pl
+        -- proc0_A: process(clk)
+        -- begin
+        --   if rising_edge(clk) then
+        --     if (ena_pipes_a(0) = '1') then
+        --       data_pipes_A(0) <= mem_out_b;
+        --       for j in 1 to g_OUT_PIPELINE-1 loop
+        --         if (ena_pipes_a(j) = '1') then
+        --             data_pipes_A(j) <= data_pipes_A(j-1);
+        --         end if;
+        --       end loop;
+        --     end if;
+        --     if (rst = '1') then
+        --       o_dout_a <= (others => '0');
+        --       o_dv_out_a <= '0';
+        --     elsif (ena_pipes_a(g_OUT_PIPELINE) = '1') then
+        --       o_dout_a <= data_pipes_A(g_OUT_PIPELINE-1)(MEM_WIDTH -1 downto 1);
+        --       o_dv_out_a <= data_pipes_A(g_OUT_PIPELINE-1)(0);
+        --     end if;
+        --   end if;
+        -- end process proc0_A;
+  
+        proc0_B: process(clk)
+        begin
+          if rising_edge(clk) then
+            -- data pipleine
+            if (ena_pipes_b(0) = '1') then
+              data_pipes_B(0) <= mem_out_b;
+              if g_OUT_PIPELINE > 1 then
+                for j in 1 to g_OUT_PIPELINE-1 loop
+                  if (ena_pipes_b(j) = '1') then
+                    data_pipes_B(j) <= data_pipes_B(j-1);
+                  end if;
+                end loop;
+              end if;
+            end if;
+            -- data out 
+            if (rst = '1') then
+              o_dout_b <= (others => '0');
+              o_dv_out_b <= '0';
+            elsif (ena_pipes_b(g_OUT_PIPELINE - 1) = '1') then
+              o_dout_b <= data_pipes_B(g_OUT_PIPELINE-1)(MEM_WIDTH -1 downto 1);
+              o_dv_out_b <= data_pipes_B(g_OUT_PIPELINE-1)(0);
+            end if;
+          end if;
+        end process proc0_B;
+        
+  
+      end generate OUT_PL_GEN;
+    end generate;
+
+    SDP_2: if g_MEMORY_STRUCTURE = "SDP_2" generate
+      PL_ULTRA: if g_MEMORY_TYPE = "ultra" generate
+
+        RAM_MEM : entity mpcvmem_lib.SimpleDualPortMem
+          generic map(
+            g_MEMORY_TYPE => g_MEMORY_TYPE,
+            -- g_MEMORY_STRUCTURE => "SDP",
+            g_ENABLE_SECOND_PORT => '1',
+            -- g_OUT_PIPELINE => 2,
+            g_RAM_WIDTH => MEM_WIDTH,
+            g_ADD_WIDTH => ADD_WIDTH,
+            g_RAM_DEPTH => MEM_DEPTH
+          )
+          port map(
+            clk         => clk,
+            rst         => rst,
+            -- Port A
+            ena        => ena,
+            i_addr_a     => mem_addr_a,--std_logic_vector(to_unsigned(mem_addr_a)); 
+            i_din_a      => mem_in_a,
+            i_wr_nrd_a   => '1',
+            -- o_dout_a     => mem_out_a,
+            -- Port B 
+            -- ena_b        => ena_b,
+            i_addr_b     => mem_addr_b,--std_logic_vector(to_unsigned(mem_addr_b));
+            -- i_din_b      => (others => '0'),--mem_in_b,
+            -- i_wr_nrd_b   => '0',
+            o_dout_b     => mem_out_b
+          );
+      end generate PL_ULTRA;
+      -- ena_a <= ena;
+
+      OUT_PL_GEN: if g_OUT_PIPELINE > 0 generate
+
+        signal ena_pipes : std_logic_vector(g_OUT_PIPELINE - 1 downto 0);
+        signal data_pipes : my_pipes;
+
+      begin
+   
+        process(clk) begin
+          if rising_edge(clk) then
+            ena_pipes(0) <= ena;
+            if g_OUT_PIPELINE > 1 then
+              for i in 1 to g_OUT_PIPELINE - 1 loop
+                ena_pipes(i) <= ena_pipes(i-1);
+              end loop;
+            end if;
+          end if;
+        end process;
+  
+        process(clk)
+        begin
+          if rising_edge(clk) then
+            -- data pipleine
+            if (ena_pipes(0) = '1') then
+              data_pipes(0) <= mem_out_b;
+              if g_OUT_PIPELINE > 1 then
+                for j in 1 to g_OUT_PIPELINE-1 loop
+                  if (ena_pipes(j) = '1') then
+                    data_pipes(j) <= data_pipes(j-1);
+                  end if;
+                end loop;
+              end if;
+            end if;
+            -- data out 
+            if (rst = '1') then
+              o_dout_b <= (others => '0');
+              o_dv_out_b <= '0';
+            elsif (ena_pipes(g_OUT_PIPELINE - 1) = '1') then
+              o_dout_b <= data_pipes(g_OUT_PIPELINE-1)(MEM_WIDTH -1 downto 1);
+              
+            end if;
+          end if;
+        end process;
+        
+        o_dv_out_b <= o_dout_b(0);
+  
+      end generate OUT_PL_GEN;
+    end generate;
     
   end generate;
   

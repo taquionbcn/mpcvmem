@@ -94,7 +94,7 @@ begin
         -- if rst = '1' then
         --   o_dout_b <= (others => '0');
         -- else
-          if ena_b = '1' then -- and i_wr_nrd_b = '0' then
+          if ena_a = '1' then -- and i_wr_nrd_b = '0' then
             o_dout_b <= mem(addr_b);
           end if;
         -- end if;
