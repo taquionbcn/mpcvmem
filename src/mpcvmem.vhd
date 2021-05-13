@@ -515,6 +515,12 @@ begin
     end generate;
 
     SDP_2: if g_MEMORY_STRUCTURE = "SDP_2" generate
+
+      signal ena_pipes : std_logic_vector(g_OUT_PIPELINE downto 0);
+      signal data_pipes : my_pipes;
+
+      begin
+
       PL_ULTRA: if g_MEMORY_TYPE = "ultra" generate
 
         RAM_MEM : entity mpcvmem_lib.SimpleDualPortMem
@@ -544,54 +550,60 @@ begin
             o_dout_b     => mem_out_b
           );
       end generate PL_ULTRA;
-      -- ena_a <= ena;
 
-      OUT_PL_GEN: if g_OUT_PIPELINE > 0 generate
+      process(clk) begin
+        if rising_edge(clk) then
+          ena_pipes(0) <= ena;
+        end if;
+      end process;
 
-        signal ena_pipes : std_logic_vector(g_OUT_PIPELINE - 1 downto 0);
-        signal data_pipes : my_pipes;
+      OUT_PL0_GEN: if g_OUT_PIPELINE > 0 generate
 
-        begin
-   
         process(clk) begin
           if rising_edge(clk) then
-            ena_pipes(0) <= ena;
-            if g_OUT_PIPELINE > 1 then
-              for i in 1 to g_OUT_PIPELINE - 1 loop
+            if (ena_pipes(0) = '1') then
+              data_pipes(0) <= mem_out_b;
+            end if;
+          end if;
+        end process;
+
+        OUT_PL1_GEN: if g_OUT_PIPELINE > 1 generate
+
+          process(clk) begin
+            if rising_edge(clk) then
+              for i in 1 to g_OUT_PIPELINE loop
                 ena_pipes(i) <= ena_pipes(i-1);
               end loop;
             end if;
-          end if;
-        end process;
-  
-        process(clk)
-        begin
-          if rising_edge(clk) then
-            -- data pipleine
-            if (ena_pipes(0) = '1') then
-              data_pipes(0) <= mem_out_b;
-              if g_OUT_PIPELINE > 1 then
-                for j in 1 to g_OUT_PIPELINE-1 loop
-                  if (ena_pipes(j) = '1') then
-                    data_pipes(j) <= data_pipes(j-1);
-                  end if;
-                end loop;
+          end process;
+
+          process(clk) begin
+            if rising_edge(clk) then
+              for j in 1 to g_OUT_PIPELINE - 1 loop
+                if (ena_pipes(j) = '1') then
+                  data_pipes(j) <= data_pipes(j-1);
+                end if;
+              end loop;
+            end if;
+          end process;
+      
+        end generate OUT_PL1_GEN;
+
+          process(clk) begin
+            if rising_edge(clk) then
+              -- data out 
+              if (rst = '1') then
+                o_dout_b <= (others => '0');
+              elsif (ena_pipes(g_OUT_PIPELINE) = '1') then
+                o_dout_b   <= data_pipes(g_OUT_PIPELINE-1)(MEM_WIDTH -1 downto 1);
+                o_dv_out_b <= data_pipes(g_OUT_PIPELINE-1)(0);
               end if;
             end if;
-            -- data out 
-            if (rst = '1') then
-              o_dout_b <= (others => '0');
-              o_dv_out_b <= '0';
-            elsif (ena_pipes(g_OUT_PIPELINE - 1) = '1') then
-              o_dout_b <= data_pipes(g_OUT_PIPELINE-1)(MEM_WIDTH -1 downto 1);
-              
-            end if;
-          end if;
-        end process;
-        
-        o_dv_out_b <= o_dout_b(0);
-  
-      end generate OUT_PL_GEN;
+          end process;
+
+          
+
+      end generate OUT_PL0_GEN;
     end generate;
     
   end generate;
