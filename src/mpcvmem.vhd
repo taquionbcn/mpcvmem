@@ -304,6 +304,10 @@ begin
     end generate NO_OUT_PL_GEN;
 
     SDP: if g_MEMORY_STRUCTURE = "SDP" generate
+
+      ena_a <= ena;
+      ena_b <= ena;
+
       PL_ULTRA: if g_MEMORY_TYPE = "ultra" generate
 
         RAM_MEM : entity mpcvmem_lib.DualPortMem
@@ -334,7 +338,7 @@ begin
           );
       end generate PL_ULTRA;
 
-      ena_a <= ena;
+      
 
       OUT_PL_GEN: if g_OUT_PIPELINE > 0 generate
    
@@ -547,7 +551,7 @@ begin
         signal ena_pipes : std_logic_vector(g_OUT_PIPELINE - 1 downto 0);
         signal data_pipes : my_pipes;
 
-      begin
+        begin
    
         process(clk) begin
           if rising_edge(clk) then
