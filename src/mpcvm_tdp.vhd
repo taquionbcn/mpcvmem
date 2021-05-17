@@ -18,7 +18,7 @@ use ieee.math_real.all;
 
 library mpcvmem_lib;
 
-entity DualPortMem is
+entity mpcvm_tdp is
   generic(
     g_MEMORY_TYPE         : string := "distributed";
     g_MEMORY_STRUCTURE    : string := "SDP";
@@ -45,9 +45,9 @@ entity DualPortMem is
     i_wr_nrd_b  : in  std_logic := '0';
     o_dout_b    : out std_logic_vector(g_RAM_WIDTH-1 downto 0)
   );
-end entity DualPortMem;
+end entity mpcvm_tdp;
 
-architecture beh of DualPortMem is
+architecture beh of mpcvm_tdp is
   function init_mem_depth(m : integer; x : integer) return integer is
     variable y : integer;
   begin

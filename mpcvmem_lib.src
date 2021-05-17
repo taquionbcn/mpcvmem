@@ -1,4 +1,5 @@
 shared/vhdl_amc/mpcvmem/pkg/mpcvmem_pkg.vhd
-shared/vhdl_amc/mpcvmem/src/mpcvmem.vhd
-shared/vhdl_amc/mpcvmem/src/DualPortMem.vhd
-shared/vhdl_amc/mpcvmem/src/SimpleDualPortMem.vhd
+shared/vhdl_amc/mpcvmem/src/mpcvm_top.vhd
+shared/vhdl_amc/mpcvmem/src/mpcvm_pl_ctrl.vhd
+shared/vhdl_amc/mpcvmem/src/mpcvm_tdp.vhd
+shared/vhdl_amc/mpcvmem/src/mpcvm_sdp.vhd

@@ -18,13 +18,13 @@ use ieee.math_real.all;
 
 library mpcvmem_lib;
 
-entity SimpleDualPortMem is
+entity mpcvm_sdp is
   generic(
     g_MEMORY_TYPE         : string := "distributed";
     -- g_MEMORY_STRUCTURE    : string := "SDP";
-    g_ENABLE_SECOND_PORT  : std_logic := '0';
+    -- g_ENABLE_SECOND_PORT  : std_logic := '0';
+    g_OUT_PIPELINE        : integer := 2;
 
-    -- g_OUT_PIPELINE        : integer := 0;
     g_RAM_WIDTH           : integer := 0;
     g_ADD_WIDTH           : integer := 0;
     g_RAM_DEPTH           : integer := 0
@@ -45,9 +45,9 @@ entity SimpleDualPortMem is
     -- i_wr_nrd_b  : in  std_logic := '0';
     o_dout_b    : out std_logic_vector(g_RAM_WIDTH-1 downto 0)
   );
-end entity SimpleDualPortMem;
+end entity mpcvm_sdp;
 
-architecture beh of SimpleDualPortMem is
+architecture beh of mpcvm_sdp is
   function init_mem_depth(m : integer; x : integer) return integer is
     variable y : integer;
   begin
@@ -64,33 +64,58 @@ architecture beh of SimpleDualPortMem is
   type mem_ram_t is array (RAM_DEPTH - 1 downto 0) of std_logic_vector(g_RAM_WIDTH-1 downto 0);	
   signal mem : mem_ram_t := (others => (others => '0'));
 
+  signal mem_reg : std_logic_vector(g_RAM_WIDTH-1 downto 0);
+
   attribute RAM_STYLE : string;
   attribute RAM_STYLE of mem : signal is "ultra";--g_MEMORY_TYPE;
 
+  signal ena_pipes : std_logic_vector(g_OUT_PIPELINE downto 0);
+  type data_pl_t is array (g_OUT_PIPELINE-1 downto 0) of std_logic_vector(g_RAM_WIDTH-1 downto 0);
+  signal data_pipes : data_pl_t;
+
 begin
 
-  WR_A: process(clk) begin
+  process(clk) begin
     if rising_edge(clk) then
       -- if rst = '1' then
       -- else
-        if ena = '1' and i_wr_nrd_a = '1' then
-          mem(to_integer(unsigned(i_addr_a))) <= i_din_a;
+        if ena = '1' then
+          if i_wr_nrd_a = '1' then
+            mem(to_integer(unsigned(i_addr_a))) <= i_din_a;
+          end if;
+            mem_reg <= mem(to_integer(unsigned(i_addr_b)));
         end if;
       -- end if;
     end if;
-  end process WR_A;
-
-  RD_B: process(clk) begin
+  end process;
+  -- The enable of the RAM goes through a pipeline to produce a
+  -- series of pipelined enable signals required to control the data
+  -- pipeline.
+  process(clk)
+  begin
     if rising_edge(clk) then
-      -- if rst = '1' then
-      --   o_dout_b <= (others => '0');
-      -- else
-        if ena = '1' then -- and i_wr_nrd_b = '0' then
-          o_dout_b <= mem(to_integer(unsigned(i_addr_b)));
-        end if;
-      -- end if;
+      ena_pipes(0) <= ena;
+      for i in 0 to g_OUT_PIPELINE-1 loop
+        ena_pipes(i+1) <= ena_pipes(i);
+      end loop;
     end if;
-  end process RD_B;
+  end process;
 
+  -- RAM output data goes through a pipeline.
+  process(clk)
+  begin
+    if rising_edge(clk) then
+      if(ena_pipes(0) = '1') then
+        data_pipes(0) <= mem_reg;
+      end if;
+      for i in 0 to g_OUT_PIPELINE-2 loop
+        if(ena_pipes(i+1) = '1') then
+          data_pipes(i+1) <= data_pipes(i);
+        end if;
+      end loop;
+    end if;
+  end process;
+
+  o_dout_b <= data_pipes(g_OUT_PIPELINE-1);
 
 end architecture beh;
